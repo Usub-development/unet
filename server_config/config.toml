@@ -1,0 +1,14 @@
+doc_root = "build"
+[certs]
+key_file = "server.key"
+cert_file = "server.pem"
+
+[net]
+port = 443
+
+[server]
+threads = 1
+ssl = true
+http_version = 2
+ip_addr = "0.0.0.0"
+ipv = 4
