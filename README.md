@@ -1,34 +1,84 @@
-# webserver
+# Webserver
 
-## Building
+**Fast and versatile web framework in modern C++**
 
-`cmake -DUVENT_PATH=<PATH/TO/UVENT> -DUVENT_BUILD_PATH=<PATH/TO/UVENT/BUILD> ..`
-`make`
+Webserver is a lightweight, high-performance framework built on top of [Uvent](https://github.com/Usub-development/uvent).  
+It provides everything you need to handle HTTP/1.0 and HTTP/1.1 efficiently, with planned support for HTTP/2 and HTTP/3.
 
-## Generating certificate
+---
+
+## Features
+- 🚀 High-performance async event loop (via Uvent)
+- 📦 RFC-compliant HTTP parser
+- 🔌 Middleware and routing system (regex & radix)
+- 🧩 Modular and extensible design
+- 🔒 TLS/SSL support (optional, OpenSSL)
+
+---
+
+## Quick Start
+
+Minimal server:
+
+```cpp
+#include "server/server.h"
+#include "Protocols/HTTP/Message.h"
+
+using namespace usub::server;
+
+void handler(protocols::http::Request &req, protocols::http::Response &res) {
+    res.setStatus(200).setMessage("OK").setBody("Hello World!\n");
+}
+
+int main() {
+    Server server("../config/config.toml");
+    server.handle({"GET"}, "/hello", handler);
+    server.run();
+}
+````
+
+Run:
+
 ```bash
-openssl genpkey -algorithm RSA -out server.key
-openssl req -new -key server.key -out server.csr -subj '/C=RU/ST=Moscow/L=Moscow/O=tcpTestServer/OU=Unit Team/emailAddress=test@test.com/CN=test.com'
-openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.pem
-```
-## To test Server it's possible to use CURL:
-```bash
-# HTTP2
-curl --http2  --cacert /path/to/certificate/server.pem -X POST https://localhost:8080 -d '{"test":"test"}' # for test without debug info
-curl --http2  --cacert /path/to/certificate/server.pem -X POST https://localhost:8080 -d '{"test":"test"}' -v # for test with debug info
-
-# HTTP1
-curl -0  --cacert /path/to/certificate/server.pem -X POST https://localhost:8080 -d '{"test":"test"}' # for test without debug info
-curl -0  --cacert /path/to/certificate/server.pem -X POST https://localhost:8080 -d '{"test":"test"}' -v # for test with debug info 
+curl http://127.0.0.1:8111/hello
 ```
 
-## To test ServerTypes it's possible to use CURL:
-```bash
-# destination port should be the same as in toml file 
-# ssl
-curl --cacert /path/to/certificate/server.pem -v https://localhost:8111/hello
-# no ssl
-curl -v https://localhost:8111/hello
+---
+
+## Documentation
+
+Full documentation:
+* [Getting Started Guide](https://usub-development.github.io/webserver/getting-started/)
+* [Installation](https://usub-development.github.io/webserver/installation/)
+* [Middleware](https://usub-development.github.io/webserver/middlewares/)
+* [Request & Response](https://usub-development.github.io/webserver/request-response/)
+
+---
+
+## Roadmap
+
+* ✅ HTTP/1.0 / 1.1
+* 🚧 Extended tests & docs
+* 📅 Planned: HTTP/2, HTTP/3, WebSocket upgrades, streaming
+
+See [Roadmap](https://usub-development.github.io/webserver/roadmap/).
+
+---
+
+## Contributing
+
+We welcome contributions! Please see the [Contributing Guide](https://usub-development.github.io/webserver/contributing/).
+Coding style is documented [here](https://usub-development.github.io/webserver/contributing/#coding-style).
+
+---
+
+## License
+
+MIT
 
 ```
 
+---
+
+Would you like me to also add **badges** (CMake, C++23, Docs link, License) at the top, so it looks more professional at first glance?
+```
