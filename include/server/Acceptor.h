@@ -52,7 +52,7 @@ namespace usub::server {
                     std::cout << "read < 0 " << rdsz << std::endl;
                     break;
                 }
-                socket.update_timeout(20000);
+                socket.set_timeout_ms(20000);
 #ifdef UVENT_DEBUG
                 spdlog::info("Read size: {}", rdsz);
 #endif
