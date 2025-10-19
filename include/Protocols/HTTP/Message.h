@@ -2,15 +2,15 @@
 #define HTTP_MESSAGE_H
 
 #include <algorithm>
+#include <any>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <unordered_map>
-#include <variant>
-
 #include <uvent/net/Socket.h>
 #include <uvent/system/SystemContext.h>
+#include <variant>
 
 // Local includes
 #include "Components/Compression/CompressionBase.h"
@@ -295,6 +295,7 @@ namespace usub::server::protocols::http {
          * @see addHandler()
          */
         std::unordered_map<std::string, std::string> uri_params;
+        mutable std::any user_data;
 
     public:
         /**

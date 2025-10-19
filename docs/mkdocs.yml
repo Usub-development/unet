@@ -69,6 +69,7 @@ nav:
  - Home: 
    - About: index.md
    - Contributing: contributing.md
+   - Roadmap: roadmap.md
  - Getting Started:
    - Installation: installation.md
    - Quick Start: quick-start.md

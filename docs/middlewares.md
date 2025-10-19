@@ -26,22 +26,22 @@ Middleware can be registered for specific phases of request handling:
 
 using namespace usub::server;
 
-bool globalMiddle(const protocols::http::Request &req, protocols::http::Response &res) {
+bool globalMiddle(const protocols::http::Request &request, protocols::http::Response &response) {
     std::cout << "Global middleware: request count++" << std::endl;
     return true;
 }
 
-bool headerMiddle(const protocols::http::Request &req, protocols::http::Response &res) {
-    std::cout << "Header middleware: URL = " << req.getURL() << std::endl;
+bool headerMiddle(const protocols::http::Request &request, protocols::http::Response &response) {
+    std::cout << "Header middleware: URL = " << request.getURL() << std::endl;
     return true;
 }
 
-bool responseMiddle(const protocols::http::Request &req, protocols::http::Response &res) {
+bool responseMiddle(const protocols::http::Request &request, protocols::http::Response &response) {
     std::cout << "Response middleware triggered" << std::endl;
     return true;
 }
 
-void handler(protocols::http::Request &req, protocols::http::Response &res) {
+void handler(protocols::http::Request &request, protocols::http::Response &response) {
     res.setStatus(200)
        .setMessage("OK")
        .addHeader("Content-Type", "text/plain")
@@ -60,6 +60,22 @@ int main() {
           .addMiddleware(protocols::http::MiddlewarePhase::RESPONSE, responseMiddle);
 
     server.run();
+}
+```
+
+## Userdata
+
+It is possible to save user data between middlewares, it is cleared upon new request response cycle
+
+```cpp
+struct UserData {
+    std::string name;
+    int age;
+};
+
+bool headerMiddle(const protocols::http::Request &request, protocols::http::Response &response) {
+    request.user_data = UserData{"John", 30};
+    return true;
 }
 ```
 
