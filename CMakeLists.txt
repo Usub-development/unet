@@ -21,30 +21,22 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 # ========================================
 
 # Find uvent
-Find_Package(uvent REQUIRED)
+include(FetchContent)
 
-set(UVENT_PATH "$ENV{UVENT_PATH}" CACHE PATH "Path to the uvent directory")
+FetchContent_Declare(
+    uvent 
+    GIT_REPOSITORY https://github.com/Usub-development/uvent.git
+    GIT_TAG v2.0.2
+    FIND_PACKAGE_ARGS
+)
+
+FetchContent_MakeAvailable(uvent)
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
 )
 
-include_directories(${server_SOURCE_DIR})
-
-set(UVENT_BUILD_PATH "$ENV{UVENT_BUILD_PATH}" CACHE PATH "Path to the uvent build directory")
-link_directories(${UVENT_BUILD_PATH})
-
-option(ACCEPT_LOGS "Enable ACCEPT_LOGS" ON)
-
 file(GLOB_RECURSE MYLIBRARY_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
-
-add_definitions(
-        -DDEBUG_HEADERS=1
-        -DDEBUG_EXTENDED_INFO=0
-        -DALLOW_SIGPIPE=0
-        -DSPECIAL_FOR_USUB_THREAD_MANAGER=1
-        -DCMAKE_EXPORT_COMPILE_COMMANDS=True
-)
 
 add_library(server SHARED
 
