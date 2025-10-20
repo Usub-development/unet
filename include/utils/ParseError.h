@@ -1,3 +1,5 @@
+#pragma once
+
 #include <expected>
 
 namespace usub::server::utils::error {

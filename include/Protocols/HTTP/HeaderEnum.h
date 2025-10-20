@@ -1,3 +1,5 @@
+#pragma once
+
 namespace usub::server::component {
     enum class HeaderEnum {
         Accept,
