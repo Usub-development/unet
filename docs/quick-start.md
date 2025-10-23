@@ -16,6 +16,8 @@ port = 25565
 ssl  = false
 ```
 
+For description of each param you can see: [config](config.md)
+
 Create a `main.cpp`:
 
 ```cpp
