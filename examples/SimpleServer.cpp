@@ -57,7 +57,7 @@ usub::uvent::task::Awaitable<void> test1() {
     co_return;
 }
 
-usub::uvent::task::Awaitable<void> handlerFunction(usub::server::protocols::http::Request &request, usub::server::protocols::http::Response &response) {
+ServerHandler handlerFunction(usub::server::protocols::http::Request &request, usub::server::protocols::http::Response &response) {
 
     auto headers = request.getHeaders();
     for (const auto &[name, values]: headers) {
