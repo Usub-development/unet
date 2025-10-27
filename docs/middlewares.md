@@ -9,9 +9,8 @@ They are simple functions that take a `Request` and `Response` reference, return
 
 Middleware can be registered for specific phases of request handling:
 
-
 **SETTINGS** - Middleware executed when the uri or pseudo headers become known, to set up handler specific limits
-**HEADER** - Middleware executed after the headers were parsed. 
+**HEADER** - Middleware executed after the headers were parsed.
 **BODY** - Middleware executed during the body processing phase in certain data types.
 **RESPONSE** - Middleware executed during sending response, called only once per response.
 
@@ -41,11 +40,12 @@ bool responseMiddle(const protocols::http::Request &request, protocols::http::Re
     return true;
 }
 
-void handler(protocols::http::Request &request, protocols::http::Response &response) {
+ServerHandler<void> handler(protocols::http::Request &request, protocols::http::Response &response) {
     res.setStatus(200)
        .setMessage("OK")
        .addHeader("Content-Type", "text/plain")
        .setBody("Hello with middleware!\n");
+    co_return;
 }
 
 int main() {

@@ -136,5 +136,6 @@ namespace usub::server {
 
 }// namespace usub::server
 
+using ServerHandler = usub::uvent::task::Awaitable<void>;
 
 #endif
