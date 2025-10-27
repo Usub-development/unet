@@ -57,7 +57,8 @@ namespace usub::server {
                 spdlog::info("Read size: {}", rdsz);
 #endif
                 std::string request_string{buffer.data(), buffer.data() + buffer.size()};
-                http1.readCallbackSync(request_string, socket);
+                // http1.readCallbackSync(request_string, socket);
+                co_await http1.readCallback(request_string, socket);
 
                 const bool conn_close_resp = response_headers.containsValue(component::HeaderEnum::Connection, "close");
                 const bool conn_close_req = response_headers.containsValue(component::HeaderEnum::Connection, "close");

@@ -38,14 +38,11 @@ namespace usub::server::protocols::http {
 #ifdef UVENT_DEBUG
             spdlog::info("Entering readCallback");
 #endif
-            std::cout << "Entering readCallback" << std::endl;
             std::optional<std::pair<Route *, bool>> match{};
             std::string::const_iterator c{};
 
         retry_parse:
             if (c == data.end()) co_return;
-            // co_await std::suspend_always{};
-            // co_return;
             c = this->request_.parseHTTP1_X(data, c);
 
             // if (this->request_.getState() < STATE::HEADERS_PARSED) co_return;
@@ -65,7 +62,7 @@ namespace usub::server::protocols::http {
                 } else {
                     this->request_.setState(REQUEST_STATE::NOT_FOUND);
                     this->response_.setStatus(404);
-                    this->endpoint_handler_->executeErrorChain(this->request_, this->response_);
+                    // this->ErrorPageHandler(this->request_)
                     co_return;
                 }
             }
@@ -92,8 +89,8 @@ namespace usub::server::protocols::http {
                     }
                     goto retry_parse;
                 case REQUEST_STATE::FINISHED:
-                    std::cout << "Entering endpoint" << std::endl;
-                    // co_await this->matched_route_->handler(this->request_, this->response_);
+
+                    co_await this->matched_route_->handler(this->request_, this->response_);
                     if (!this->response_.isSent()) {
                         middleware_rv = this->matched_route_->middleware_chain.execute(MiddlewarePhase::RESPONSE, this->request_, this->response_);
                     }
