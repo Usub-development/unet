@@ -1,5 +1,6 @@
 #include "Protocols/HTTP/RadixRouter.h"
 
+
 namespace usub::server::protocols::http {
 
     size_t RadixRouter::findMatchingBrace(const std::string& pathPattern, size_t start) const {
@@ -24,7 +25,7 @@ namespace usub::server::protocols::http {
         for (size_t i = 0; i < rx.size(); ++i) {
             if (rx[i] == '(') {
                 if (i + 1 >= rx.size() || rx[i + 1] != '?') {
-                    return true; // найден захватывающий блок
+                    return true; // захватывающая группа
                 }
             }
         }
@@ -33,12 +34,12 @@ namespace usub::server::protocols::http {
 
     std::vector<std::string> RadixRouter::splitPath(const std::string& path) {
         std::vector<std::string> parts;
-        parts.reserve(8); // микро-оптимизация
+        parts.reserve(8);
         std::string token;
         std::stringstream ss(path);
 
         if (!path.empty() && path[0] == '/') {
-            ss.get(); // пропускаем первый '/'
+            ss.get(); // skip first '/'
         }
 
         while (std::getline(ss, token, '/')) {
@@ -140,11 +141,11 @@ namespace usub::server::protocols::http {
         }
 
         if (cur.kind == Segment::Par) {
-            // СЛИЯНИЕ ТОЛЬКО ЕСЛИ СОВПАЛИ И ПАТТЕРН, И ИМЯ ПАРАМЕТРА
+            // Сливаем ребро только если совпадают и имя, и паттерн (через constraint)
             for (ParamEdge& edge : node->param) {
                 if (edge.constraint && cur.constraint
                     && edge.constraint->pattern == cur.constraint->pattern
-                    && edge.name == cur.name) // фикc: сравнение имени
+                    && edge.name == cur.name)
                 {
                     insert(edge.child.get(), segs, idx + 1, route, has_trailing_slash);
                     return;
@@ -158,8 +159,8 @@ namespace usub::server::protocols::http {
             edge.constraint = cur.constraint;
             // edge.pattern_str = cur.re;
 
-            node->param.push_back(std::move(edge)); // сначала добавили
-            insert(node->param.back().child.get(), segs, idx + 1, route, has_trailing_slash); // потом рекурс
+            node->param.push_back(std::move(edge)); // сначала добавляем
+            insert(node->param.back().child.get(), segs, idx + 1, route, has_trailing_slash); // потом уходим вниз
             return;
         }
 
@@ -191,7 +192,7 @@ namespace usub::server::protocols::http {
 
     std::optional<std::pair<Route*, bool>>
     RadixRouter::match(Request& request, std::string* error_description) {
-        std::string path = request.getURL();
+        const std::string path = request.getURL();
 
         std::vector<std::string> segs = splitPath(path);
         Route* routePtr = nullptr;
@@ -282,7 +283,7 @@ namespace usub::server::protocols::http {
                 regexPattern += "(" + paramRegex + ")";
                 position = end + 1;
             } else {
-                appendEsc(c); // фикc: экранируем литералы
+                appendEsc(c); // экранируем литералы
                 position++;
             }
         }
@@ -303,7 +304,6 @@ namespace usub::server::protocols::http {
     Route& RadixRouter::addHandler(const std::set<std::string>& method,
                                    const std::string& pathPattern,
                                    std::function<FunctionType> function) {
-        // единый путь — только radix-дерево
         return addRoute(method, pathPattern, std::move(function));
     }
 
@@ -318,8 +318,79 @@ namespace usub::server::protocols::http {
                                    const std::string& pathPattern,
                                    std::function<FunctionType> function,
                                    std::unordered_map<std::string_view, const param_constraint*>&& constraints) {
-        // единый путь — только radix-дерево
         return addRoute(method, pathPattern, std::move(function), constraints);
+    }
+
+    // ---- Рекурсивный поиск с бэктрекингом ----------------------------------
+
+    bool RadixRouter::matchDFS(RadixNode* node,
+                               const std::vector<std::string>& segs,
+                               std::size_t idx,
+                               Request& req,
+                               Route*& out,
+                               std::string* last_error) {
+        if (idx == segs.size()) {
+            if (node->route) {
+                const bool req_has_trailing = !req.getURL().empty() && req.getURL().back() == '/';
+                if (node->trailing_slash == req_has_trailing) {
+                    out = node->route.get();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        const std::string& cur = segs[idx];
+
+        // 1) Литерал
+        if (auto lit = node->literal.find(cur); lit != node->literal.end()) {
+            if (matchDFS(lit->second.get(), segs, idx + 1, req, out, last_error)) {
+                return true;
+            }
+        }
+
+        // 2) Параметры — пробуем все подходящие, БЭКТРЕКИНГ
+        std::string local_error;
+        for (ParamEdge& edge : node->param) {
+            if (edge.regex && std::regex_match(cur, *edge.regex)) {
+                // save old value if present
+                auto prev_it = req.uri_params.find(edge.name);
+                std::optional<std::string> prev_value;
+                if (prev_it != req.uri_params.end()) prev_value = prev_it->second;
+
+                req.uri_params[edge.name] = cur;
+
+                if (matchDFS(edge.child.get(), segs, idx + 1, req, out, last_error)) {
+                    return true;
+                }
+
+                // backtrack
+                if (prev_value) req.uri_params[edge.name] = *prev_value;
+                else req.uri_params.erase(edge.name);
+            } else if (last_error) {
+                local_error = edge.constraint ? edge.constraint->description
+                                              : ("Invalid value for parameter: " + edge.name);
+            }
+        }
+
+        // 3) Wildcard — съедаем хвост
+        if (node->wildcard) {
+            std::string tail;
+            for (std::size_t i = idx; i < segs.size(); ++i) {
+                tail += '/' + segs[i];
+            }
+            if (!tail.empty()) tail.erase(0, 1);
+            req.uri_params[node->wildcard_name] = tail;
+            // Разрешаем матчить дальше: wildcard-узел помечается route только в конце
+            if (matchDFS(node->wildcard.get(), segs, segs.size(), req, out, last_error)) {
+                return true;
+            }
+            // backtrack wildcard param
+            req.uri_params.erase(node->wildcard_name);
+        }
+
+        if (last_error && !local_error.empty()) *last_error = local_error;
+        return false;
     }
 
     bool RadixRouter::matchIter(RadixNode* node,
@@ -327,59 +398,10 @@ namespace usub::server::protocols::http {
                                 Request& req,
                                 Route*& out,
                                 std::string* last_error) {
-        std::size_t idx = 0;
-        out = nullptr;
-
-        while (true) {
-            if (idx == segs.size()) {
-                if (node->route) {
-                    out = node->route.get();
-                }
-                if (out && node->trailing_slash != (req.getURL().back() == '/')) {
-                    out = nullptr;
-                }
-                return out != nullptr;
-            }
-
-            const std::string& cur = segs[idx];
-
-            auto literal_it = node->literal.find(cur);
-            if (literal_it != node->literal.end()) {
-                node = literal_it->second.get();
-                ++idx;
-                continue;
-            }
-
-            bool matched = false;
-            for (ParamEdge& edge : node->param) {
-                if (edge.regex && std::regex_match(cur, *edge.regex)) {
-                    req.uri_params[edge.name] = cur;
-                    node = edge.child.get();
-                    ++idx;
-                    matched = true;
-                    break;
-                } else if (last_error) {
-                    *last_error = edge.constraint ? edge.constraint->description
-                                                  : "Invalid value for parameter: " + edge.name;
-                }
-            }
-            if (matched) continue;
-
-            if (node->wildcard) {
-                std::string tail;
-                for (std::size_t i = idx; i < segs.size(); ++i) {
-                    tail += '/' + segs[i];
-                }
-                if (!tail.empty()) tail.erase(0, 1);
-                req.uri_params[node->wildcard_name] = tail;
-
-                out = node->wildcard->route.get();
-                return out != nullptr;
-            }
-
-            return false;
-        }
+        return matchDFS(node, segs, 0, req, out, last_error);
     }
+
+    // ---- Отладочный дамп ----------------------------------------------------
 
     std::string RadixRouter::dump() const {
         std::ostringstream buf;
