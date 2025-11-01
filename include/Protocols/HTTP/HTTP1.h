@@ -53,11 +53,13 @@ namespace usub::server::protocols::http {
                 this->response_.setSocket(&socket);
                 if (match) {
                     auto &[route, methodAllowed] = match.value();
-                    this->response_.addHeader("Server", "usub");
-                    this->response_.setRoute(route);
                     if (!methodAllowed) {// this->ErrorPageHandler(this->request_);
+                        this->request_.setState(REQUEST_STATE::METHOD_NOT_ALLOWED);
+                        this->response_.setStatus(405);
                         co_return;
                     }
+                    this->response_.addHeader("Server", "usub");
+                    this->response_.setRoute(route);
                     this->matched_route_ = route;
                 } else {
                     this->request_.setState(REQUEST_STATE::NOT_FOUND);

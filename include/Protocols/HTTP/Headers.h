@@ -1597,6 +1597,7 @@ namespace usub::server {
 #endif
 
                                 default:
+                                    usub::utils::trim(value);
                                     this->unknown_headers_map_[key].push_back(value);
                                     break;
                             }
