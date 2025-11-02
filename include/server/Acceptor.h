@@ -45,11 +45,10 @@ namespace usub::server {
 
             while (true) {
                 buffer.clear();
-                std::cout << "Before read" << std::endl;
+                
                 ssize_t rdsz = co_await socket.async_read(buffer, MAX_READ_SIZE);
-                std::cout << "After read" << std::endl;
+                
                 if (rdsz <= 0) {
-                    std::cout << "read < 0 " << rdsz << std::endl;
                     break;
                 }
                 socket.set_timeout_ms(20000);
@@ -57,7 +56,8 @@ namespace usub::server {
                 spdlog::info("Read size: {}", rdsz);
 #endif
                 std::string request_string{buffer.data(), buffer.data() + buffer.size()};
-                http1.readCallbackSync(request_string, socket);
+                // http1.readCallbackSync(request_string, socket);
+                co_await http1.readCallback(request_string, socket);
 
                 const bool conn_close_resp = response_headers.containsValue(component::HeaderEnum::Connection, "close");
                 const bool conn_close_req = response_headers.containsValue(component::HeaderEnum::Connection, "close");
@@ -68,11 +68,11 @@ namespace usub::server {
                 while (!response.isSent() && request.getState() >= protocols::http::REQUEST_STATE::FINISHED) {
                     const std::string responseString = response.pull();
 
-                    std::cout << "Before write" << std::endl;
+                    
                     ssize_t wrsz = co_await socket.async_write((uint8_t *) responseString.data(), responseString.size());
-                    std::cout << "After write" << std::endl;
+                    
                     if (wrsz <= 0) {
-                        std::cout << "write < 0" << std::endl;
+                        
                         break;
                     }
 #ifdef UVENT_DEBUG

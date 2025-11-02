@@ -2,7 +2,7 @@
 
 ## Overview
 
-A configuration consists of:
+A configuration file consists of:
 
 * A single `[server]` section with process‐wide parameters.
 * An ordered list of `[[listener]]` blocks.

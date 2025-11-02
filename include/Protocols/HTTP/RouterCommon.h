@@ -26,7 +26,8 @@ namespace usub::server::protocols::http {
      * @see Route
      * @see HTTPEndpointHandler
      */
-    using FunctionType = void(Request &, Response &);
+    // using FunctionType = void(Request &, Response &);
+    using FunctionType = uvent::task::Awaitable<void>(Request &, Response &);
 
     /**
      * @struct Route
@@ -110,4 +111,4 @@ namespace usub::server::protocols::http {
          */
         Route &addMiddleware(MiddlewarePhase phase, std::function<MiddlewareFunctionType> middleware);
     };
-} // namespace usub::server::protocols::http
+}// namespace usub::server::protocols::http
