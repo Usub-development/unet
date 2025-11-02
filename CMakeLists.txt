@@ -26,8 +26,8 @@ include(FetchContent)
 FetchContent_Declare(
     uvent 
     GIT_REPOSITORY https://github.com/Usub-development/uvent.git
-    GIT_TAG main
-    #    FIND_PACKAGE_ARGS
+    GIT_TAG v3.0.3
+    FIND_PACKAGE_ARGS
 )
 
 FetchContent_MakeAvailable(uvent)
