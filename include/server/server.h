@@ -136,5 +136,13 @@ namespace usub::server {
 
 }// namespace usub::server
 
+using ServerHandler = usub::uvent::task::Awaitable<void>;
+
+template <auto MemFn, class T>
+auto bind_handler(T& obj) {
+    return [&obj](auto& req, auto& res) -> usub::uvent::task::Awaitable<void> {
+        co_await (obj.*MemFn)(req, res);
+    };
+}
 
 #endif

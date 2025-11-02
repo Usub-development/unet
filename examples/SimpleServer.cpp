@@ -48,8 +48,16 @@ bool responseMiddle(const usub::server::protocols::http::Request &request, usub:
     // std::cout << "request middleware reached " << request_cntr << std::endl;
     return true;
 }
+usub::uvent::task::Awaitable<int> test() {
+    co_return 1;
+}
 
-void handlerFunction(usub::server::protocols::http::Request &request, usub::server::protocols::http::Response &response) {
+usub::uvent::task::Awaitable<void> test1() {
+    std::cout << co_await test() << std::endl;
+    co_return;
+}
+
+ServerHandler handlerFunction(usub::server::protocols::http::Request &request, usub::server::protocols::http::Response &response) {
 
     auto headers = request.getHeaders();
     for (const auto &[name, values]: headers) {
@@ -73,7 +81,8 @@ void handlerFunction(usub::server::protocols::http::Request &request, usub::serv
             .setMessage("OK")
             .addHeader("Content-Type", "text/html")
             .setBody("Hello World! How are you \n");
-    return;
+    co_await test1();
+    co_return;
 }
 
 #include "../include/Components/Compression/gzip.h"// FOR TESTING

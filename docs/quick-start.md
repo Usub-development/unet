@@ -27,13 +27,14 @@ Create a `main.cpp`:
 
 using namespace usub::server;
 
-void handlerFunction(protocols::http::Request &request,
+ServerHandler<void> handlerFunction(protocols::http::Request &request,
                      protocols::http::Response &response) {
     std::cout << "Matched: " << request.getURL() << std::endl;
     response.setStatus(200)
             .setMessage("OK")
             .addHeader("Content-Type", "text/plain")
             .setBody("Hello World from Webserver!\n");
+    co_return;
 }
 
 int main() {
@@ -74,6 +75,5 @@ Hello World from Webserver!
 
 ## Next Steps
 
-* Learn how to work with [requests/responses](request-response.md)
-* Learn how to add [middleware](middlewares.md).
-
+- Learn how to work with [requests/responses](request-response.md)
+- Learn how to add [middleware](middlewares.md).
