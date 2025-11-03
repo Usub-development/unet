@@ -472,8 +472,7 @@ int main()
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = SIG_IGN;
     sigaction(SIGPIPE, &sa, nullptr);
-
-    // Локальный пул БЕЗ глобалок
+    
     usub::pg::PgPool pool(
         "localhost", // host
         "12432", // port
@@ -485,16 +484,13 @@ int main()
 
     usub::Uvent uvent(1);
 
-    // Схема
     uvent.for_each_thread([&](int idx, usub::uvent::thread::ThreadLocalStorage*)
     {
         usub::uvent::system::co_spawn_static(ensure_schema(pool), idx);
     });
 
-    // Listen/Notify в фоне
     usub::uvent::system::co_spawn(run_notifications(pool));
 
-    // HTTP сервер
     usub::server::Server srv("../config.toml");
 
     srv.handle({"GET"}, "/hello",
