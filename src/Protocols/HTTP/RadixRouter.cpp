@@ -183,6 +183,51 @@ namespace usub::server::protocols::http {
         const bool has_trailing_slash = !pattern.empty() && pattern.back() == '/';
         insert(root_.get(), segs, 0, routePtr, has_trailing_slash);
 
+        std::ostringstream methods_stream;
+        for (auto it = methods.begin(); it != methods.end(); ++it) {
+            if (it != methods.begin()) methods_stream << ',';
+            methods_stream << *it;
+        }
+
+        std::ostringstream path_stream;
+        path_stream << '/';
+        for (size_t i = 0; i < segs.size(); ++i) {
+            if (i) path_stream << '/';
+            const auto &s = segs[i];
+            switch (s.kind) {
+                case Segment::Lit:
+                    path_stream << s.lit;
+                    break;
+                case Segment::Par: {
+                    path_stream << '{' << s.name << '}';
+                    const param_constraint *pc = nullptr;
+                    if (auto it = constraints.find(s.name); it != constraints.end() && it->second) {
+                        pc = it->second;
+                    } else if (s.constraint) {
+                        pc = &(*s.constraint);
+                    }
+                    if (pc) {
+                        path_stream << '('
+                                    << "constraint_name:" << s.name
+                                    << "|constraint_desc:" << pc->description
+                                    << "|constraint_regex:" << pc->pattern
+                                    << ')';
+                    }
+                    break;
+                }
+                case Segment::Wild:
+                    path_stream << '*';
+                    break;
+            }
+        }
+        if (has_trailing_slash) path_stream << '/';
+
+        std::cout << "route methods: " << methods_stream.str() << "\n"
+                  << "path: " << path_stream.str() << "\n"
+                  << "hint: router.addHandler({\"" << methods_stream.str()
+                  << "\"}, \"" << pattern << "\", handlerFunction);\n"
+                  << std::endl;
+
         return *rawPtr;
     }
 
