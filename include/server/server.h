@@ -53,6 +53,8 @@ namespace usub::server {
             return this->endpoint_handler_->addHandler(methods, endpoint, function);
         }
 
+        template<typename T = RouterType>
+            requires(not std::is_same_v<T, usub::server::protocols::http::RadixRouter>)
         auto &handle(std::initializer_list<const char *> methods,
                      const std::string &endpoint,
                      std::function<usub::server::protocols::http::FunctionType> function) {
@@ -138,9 +140,9 @@ namespace usub::server {
 
 using ServerHandler = usub::uvent::task::Awaitable<void>;
 
-template <auto MemFn, class T>
-auto bind_handler(T& obj) {
-    return [&obj](auto& req, auto& res) -> usub::uvent::task::Awaitable<void> {
+template<auto MemFn, class T>
+auto bind_handler(T &obj) {
+    return [&obj](auto &req, auto &res) -> usub::uvent::task::Awaitable<void> {
         co_await (obj.*MemFn)(req, res);
     };
 }
