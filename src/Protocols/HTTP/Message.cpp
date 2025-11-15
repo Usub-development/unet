@@ -1427,3 +1427,79 @@ usub::uvent::task::Awaitable<bool> usub::server::protocols::http::Request::parse
     }
     co_return true;
 }
+
+void usub::server::protocols::http::Request::setUri(const std::string &uri) { // TODO: this is just not correct, redo
+    this->urn_.getPath() = uri;
+}
+
+
+std::string usub::server::protocols::http::Request::string() {
+    // Build request line
+    const std::string& method = this->method_token_.empty() ? static_cast<const std::string&>("GET") : this->method_token_;
+    std::string target;
+
+    // Prefer full URL if available, fallback to path, default to "/"
+    try {
+        target = this->getFullURL();
+    } catch (...) {
+        // If getFullURL throws or isn't available, fallback to getURL()
+        target = this->getURL();
+    }
+    if (target.empty()) {
+        target = "/";
+    }
+
+    // Version to string
+    const char* version_str = "HTTP/1.1";
+    switch (this->http_version_) {
+        case VERSION::HTTP_1_0: version_str = "HTTP/1.0"; break;
+        case VERSION::HTTP_1_1:
+        case VERSION::HTTP_1_X:
+        case VERSION::NONE:     version_str = "HTTP/1.1"; break;
+        default:                version_str = "HTTP/1.1"; break;
+    }
+
+    std::string out;
+    out.reserve(method.size() + target.size() + this->body_.size() + 128);
+
+    out.append(method).push_back(' ');
+    out.append(target).push_back(' ');
+    out.append(version_str).append("\r\n");
+
+    // Headers
+    bool has_host = false;
+    bool has_content_length = false;
+
+    // Write existing headers and detect Host/Content-Length
+    for (const auto& kv : this->headers_) { // assumes Headers provides STL-like iteration
+        const auto& key = kv.first;
+        const auto& values = kv.second;
+
+        if (key == "host") has_host = true;
+        if (key == "content-length") has_content_length = true;
+
+        for (const auto& v : values) {
+            out.append(key).append(": ").append(v).append("\r\n");
+        }
+    }
+
+    // Add Host header for HTTP/1.1 if missing and we have authority
+    if (!has_host && (this->http_version_ == VERSION::HTTP_1_1 || this->http_version_ == VERSION::HTTP_1_X || this->http_version_ == VERSION::NONE)) {
+        if (!this->authority_.empty()) {
+            out.append("host: ").append(this->authority_).append("\r\n");
+        }
+    }
+
+    // Add Content-Length if missing and we have a body
+    if (!has_content_length && !this->body_.empty()) {
+        out.append("content-length: ").append(std::to_string(this->body_.size())).append("\r\n");
+    }
+
+    // End of headers
+    out.append("\r\n");
+
+    // Body
+    out.append(this->body_);
+
+    return out;
+}

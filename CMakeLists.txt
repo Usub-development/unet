@@ -168,12 +168,15 @@ install(EXPORT serverTargets
 option(BUILD_EXAMPLES "Build the Server example executables" OFF)
 
 if(BUILD_EXAMPLES)
-    add_executable(BasicExample examples/SimpleServer.cpp)
+    add_executable(SimpleServer examples/SimpleServer.cpp)
+    add_executable(SimpleClient examples/SimpleClient.cpp)
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_link_libraries(BasicExample server ZLIB::ZLIB pthread usub::uvent) # spdlog::spdlog
+        target_link_libraries(SimpleServer server ZLIB::ZLIB pthread usub::uvent) # spdlog::spdlog
+        target_link_libraries(SimpleClient server ZLIB::ZLIB pthread usub::uvent) # spdlog::spdlog
     else()
-        target_link_libraries(BasicExample server ZLIB::ZLIB pthread usub::uvent)
+        target_link_libraries(SimpleServer server ZLIB::ZLIB pthread usub::uvent)
+        target_link_libraries(SimpleClient server ZLIB::ZLIB pthread usub::uvent)
     endif()
 endif()
 

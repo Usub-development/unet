@@ -531,6 +531,8 @@ namespace usub::server::protocols::http {
          */
         void clear();
 
+        std::string string();
+
         /**
          * @brief Compares this request with another for equality.
          *
@@ -660,6 +662,10 @@ namespace usub::server::protocols::http {
          * @return Response& Reference to this response object.
          */
         Response &setStatus(uint16_t status_code);
+
+        RESPONSE_STATE &getState() {
+            return this->state_;
+        }
 
         /**
          * @brief Sets the HTTP status code of the response using a string view.
@@ -815,7 +821,7 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                     this->data_value_pair_.first.clear();
                     carriage_return = false;
                     state = RESPONSE_STATE::HEADERS_KEY;
-                    return ++c;// exit here after full status line
+                    break;
                 } else if (std::iscntrl(*c)) {
                     this->state_ = RESPONSE_STATE::ERROR;
                     return c;// malformed: control char in message
@@ -832,7 +838,7 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                     if (carriage_return) {
                         carriage_return = false;
                         state = RESPONSE_STATE::HEADERS_PARSED;
-                        return ++c;// headers done
+                        break;
                     } else {
                         this->state_ = RESPONSE_STATE::ERROR;
                         return c;// malformed: \n without \r
@@ -856,7 +862,7 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                     carriage_return = true;
                 } else if (*c == '\n') {
                     if (!carriage_return) {
-                        this->state_ = RESPONSE_STATE::SENT;
+                        this->state_ = RESPONSE_STATE::ERROR;
                         return c;// malformed: \n without \r
                     }
                     this->headers_.addHeader<usub::server::protocols::http::Response>(std::move(this->data_value_pair_.first), std::move(this->data_value_pair_.second));
