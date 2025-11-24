@@ -882,7 +882,6 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                 this->line_size_ = 0;
                 auto &headers = this->headers_;
                 auto &content_length_vec = headers["content-length"];
-                auto &transfer_encoding_vec = headers["transfer-encoding"];
                 auto content_length = content_length_vec.size() == 1 ? std::stoi(content_length_vec[0]) : 0;
 
                 int code = std::stoi(this->status_code_);
@@ -894,7 +893,9 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                 if (content_length > 0) {
                     this->helper_.size_ = content_length;
                     this->state_ = RESPONSE_STATE::DATA_CONTENT_LENGTH;
-                } else if (!transfer_encoding_vec.empty()) {
+                    goto content_length;
+                } else if (headers.contains("transfer-encoding") && !headers.at("transfer-encoding").empty()) {
+                    auto &transfer_encoding_vec = headers["transfer-encoding"];
                     if (transfer_encoding_vec.back() == "chunked") {
                         this->state_ = RESPONSE_STATE::DATA_CHUNKED_SIZE;
                     } else {
@@ -907,7 +908,8 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                 }
                 break;
             }
-            case RESPONSE_STATE::DATA_CONTENT_LENGTH:
+            case RESPONSE_STATE::DATA_CONTENT_LENGTH:{
+            content_length:
                 if (this->line_size_ <= this->helper_.size_) {
                     this->body_.push_back(*c);
                     ++this->line_size_;
@@ -916,11 +918,11 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                         return ++c;
                     }
                 } else {
-                    this->state_ = RESPONSE_STATE::FINISHED;
+                    this->state_ = RESPONSE_STATE::ERROR;
                     return c;// too much data
                 }
                 break;
-
+            }
             case RESPONSE_STATE::DATA_CHUNKED_SIZE:
                 if (*c == '\r') {
                     carriage_return = true;
