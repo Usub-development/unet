@@ -83,8 +83,8 @@ namespace usub::server {
         };
 
         struct Keep_Alive {
-            ssize_t timeout{-1};
-            ssize_t max{-1};
+            int timeout{-1};
+            int max{-1};
         };
 
     }// namespace component

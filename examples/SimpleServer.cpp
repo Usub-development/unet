@@ -88,7 +88,7 @@ ServerHandler handlerFunction(usub::server::protocols::http::Request &request, u
 #include "../include/Components/Compression/gzip.h"// FOR TESTING
 #include <csignal>
 #include <stdexcept>
-#include <unistd.h>
+// #include <unistd.h>
 
 void handle_alarm(int sig) {
     std::cerr << "Program timed out after 200 seconds. Exiting...\n";
@@ -121,13 +121,14 @@ int main() {
     //    router.addPlainStringHandler({"GET"}, "/ping", handlerFunction);
     // router.addHandler({"*"}, "/deposit/*", handlerFunction);
 
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = SIG_IGN;
-    sigaction(SIGPIPE, &sa, nullptr);
-    signal(SIGALRM, handle_alarm);
+    // struct sigaction sa;
+    // memset(&sa, 0, sizeof(sa));
+    // sa.sa_handler = SIG_IGN;
+    // sigaction(SIGPIPE, &sa, nullptr);
+    // signal(SIGALRM, handle_alarm);
 
-    usub::server::Server server_no_ssl("../config/https.toml");
+    // usub::server::Server server_no_ssl("../config/https.toml");
+    usub::server::Server server_no_ssl("./https.toml");
     server_no_ssl.addMiddleware(usub::server::protocols::http::MiddlewarePhase::HEADER, globalMiddle);
 
     // usub::server::Server server("/root/projects/serverMoving/confSSL.toml");
