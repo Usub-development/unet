@@ -98,7 +98,6 @@ namespace usub::server {
                     else if (http10_no_keep_alive)
                         spdlog::info("Closing connection: HTTP/1.0 and no 'Connection: keep-alive'");
 #endif
-                    std::cout << "Closing connection" << std::endl;
                     socket.shutdown();
                     co_return;
                 }

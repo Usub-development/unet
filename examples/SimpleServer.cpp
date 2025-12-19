@@ -30,7 +30,8 @@ uint64_t request_cntr{};
 struct TestInClass {
     bool headerMiddle(const usub::server::protocols::http::Request &request, usub::server::protocols::http::Response &response) {
         std::cout << "header middleware in class reached" << std::endl;
-        return true;
+        response.setStatus(401);
+        return false;
     }
 };
 
