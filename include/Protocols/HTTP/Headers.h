@@ -83,8 +83,8 @@ namespace usub::server {
         };
 
         struct Keep_Alive {
-            ssize_t timeout{-1};
-            ssize_t max{-1};
+            int timeout{-1};
+            int max{-1};
         };
 
     }// namespace component
@@ -1643,21 +1643,16 @@ namespace usub::server {
                 }
                 return rv;
             }
+
+
             // ========== Iterator Logic ==========
 
             class Iterator {
-            private:
+            public:
                 enum class Phase { Known,
                                    Unknown,
                                    End };
 
-                std::unordered_map<usub::server::component::HeaderEnum, std::vector<std::string>>::const_iterator known_it_;
-                std::unordered_map<usub::server::component::HeaderEnum, std::vector<std::string>>::const_iterator known_end_;
-                std::unordered_map<std::string, std::vector<std::string>>::const_iterator unknown_it_;
-                std::unordered_map<std::string, std::vector<std::string>>::const_iterator unknown_end_;
-                Phase phase_;
-
-            public:
                 Iterator(
                         std::unordered_map<usub::server::component::HeaderEnum, std::vector<std::string>>::const_iterator k_it,
                         std::unordered_map<usub::server::component::HeaderEnum, std::vector<std::string>>::const_iterator k_end,
@@ -1672,6 +1667,14 @@ namespace usub::server {
                         phase_ = Phase::End;
                     }
                 }
+
+                Iterator(
+                        Phase phase,
+                        std::unordered_map<usub::server::component::HeaderEnum, std::vector<std::string>>::const_iterator k_it,
+                        std::unordered_map<usub::server::component::HeaderEnum, std::vector<std::string>>::const_iterator k_end,
+                        std::unordered_map<std::string, std::vector<std::string>>::const_iterator u_it,
+                        std::unordered_map<std::string, std::vector<std::string>>::const_iterator u_end)
+                    : known_it_(k_it), known_end_(k_end), unknown_it_(u_it), unknown_end_(u_end), phase_(phase) {}
 
                 Iterator &operator++() {
                     if (phase_ == Phase::Known) {
@@ -1692,6 +1695,24 @@ namespace usub::server {
                     return *this;
                 }
 
+                bool operator==(const Iterator &other) const {
+                    if (phase_ != other.phase_) {
+                        return false;
+                    }
+
+                    switch (phase_) {
+                        case Phase::Known:
+                            return known_it_ == other.known_it_;
+                        case Phase::Unknown:
+                            return unknown_it_ == other.unknown_it_;
+                        case Phase::End:
+                            return known_it_ == other.known_it_ &&
+                                   unknown_it_ == other.unknown_it_;
+                    }
+
+                    return false;
+                }
+
                 bool operator!=(const Iterator &other) const {
                     return phase_ != other.phase_ ||
                            known_it_ != other.known_it_ ||
@@ -1707,6 +1728,13 @@ namespace usub::server {
                         return {unknown_it_->first, unknown_it_->second};
                     }
                 }
+
+            private:
+                std::unordered_map<usub::server::component::HeaderEnum, std::vector<std::string>>::const_iterator known_it_;
+                std::unordered_map<usub::server::component::HeaderEnum, std::vector<std::string>>::const_iterator known_end_;
+                std::unordered_map<std::string, std::vector<std::string>>::const_iterator unknown_it_;
+                std::unordered_map<std::string, std::vector<std::string>>::const_iterator unknown_end_;
+                Phase phase_;
             };
 
             Iterator begin() const {
@@ -1719,6 +1747,36 @@ namespace usub::server {
                 return Iterator(
                         known_headers_map_.end(), known_headers_map_.end(),
                         unknown_headers_map_.end(), unknown_headers_map_.end());
+            }
+
+            Iterator find(usub::server::component::HeaderEnum key) const {
+                auto k_it = known_headers_map_.find(key);
+                if (k_it != known_headers_map_.end()) {
+                    return Iterator(Iterator::Phase::Known,
+                                    k_it, known_headers_map_.end(),
+                                    unknown_headers_map_.begin(), unknown_headers_map_.end());
+                }
+                if (!unknown_headers_map_.empty()) {
+                    return Iterator(Iterator::Phase::Unknown,
+                                    known_headers_map_.end(), known_headers_map_.end(),
+                                    unknown_headers_map_.begin(), unknown_headers_map_.end());
+                }
+                return end();
+            }
+
+            Iterator find(std::string_view key) const {
+                auto lookup = HTTPHeaderLookup::lookupHeader(key.data(), key.size());
+                if (lookup) {
+                    return find(lookup->id);
+                }
+                std::string lower_key = usub::utils::toLower(std::string(key));
+                auto u_it = unknown_headers_map_.find(lower_key);
+                if (u_it != unknown_headers_map_.end()) {
+                    return Iterator(Iterator::Phase::Unknown,
+                                    known_headers_map_.end(), known_headers_map_.end(),
+                                    u_it, unknown_headers_map_.end());
+                }
+                return end();
             }
         };
 

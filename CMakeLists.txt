@@ -26,7 +26,7 @@ include(FetchContent)
 FetchContent_Declare(
     uvent 
     GIT_REPOSITORY https://github.com/Usub-development/uvent.git
-    GIT_TAG v3.0.3
+    GIT_TAG v3.6.0
     FIND_PACKAGE_ARGS
 )
 
@@ -38,7 +38,7 @@ include_directories(
 
 file(GLOB_RECURSE MYLIBRARY_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
 
-add_library(server SHARED
+add_library(server
 
     # Components/Compression
     src/Components/Compression/gzip.cpp
@@ -102,12 +102,20 @@ endif ()
 
 
 #add_dependencies(${CURRENT_PROJECT_NAME} run_tests)
-find_package(ZLIB REQUIRED)
+FetchContent_Declare(
+    ZLIB
+    GIT_REPOSITORY https://github.com/madler/zlib.git
+    GIT_TAG v1.3.1.2
+    FIND_PACKAGE_ARGS
+)
+
+FetchContent_MakeAvailable(ZLIB)
+
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
     target_link_libraries(server PRIVATE
             ZLIB::ZLIB
-            pthread
             usub::uvent
             #            spdlog::spdlog
     )
@@ -115,7 +123,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 else()
     target_link_libraries(server PUBLIC
             ZLIB::ZLIB
-            pthread
             usub::uvent
     )
 endif ()
@@ -173,9 +180,9 @@ if(BUILD_EXAMPLES)
     add_executable(BasicExample examples/SimpleServer.cpp)
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_link_libraries(BasicExample server ZLIB::ZLIB pthread usub::uvent spdlog::spdlog)
+        target_link_libraries(BasicExample server ZLIB::ZLIB usub::uvent spdlog::spdlog)
     else()
-        target_link_libraries(BasicExample server ZLIB::ZLIB pthread usub::uvent)
+        target_link_libraries(BasicExample server ZLIB::ZLIB usub::uvent)
     endif()
 endif()
 

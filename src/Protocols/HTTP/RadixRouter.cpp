@@ -3,7 +3,7 @@
 
 namespace usub::server::protocols::http {
 
-    size_t RadixRouter::findMatchingBrace(const std::string& pathPattern, size_t start) const {
+    size_t RadixRouter::findMatchingBrace(const std::string &pathPattern, size_t start) const {
         std::stack<char> braceStack;
         for (size_t i = start; i < pathPattern.size(); ++i) {
             if (pathPattern[i] == '{') {
@@ -21,25 +21,25 @@ namespace usub::server::protocols::http {
         return std::string::npos;
     }
 
-    bool RadixRouter::containsCapturingGroup(const std::string& rx) const {
+    bool RadixRouter::containsCapturingGroup(const std::string &rx) const {
         for (size_t i = 0; i < rx.size(); ++i) {
             if (rx[i] == '(') {
                 if (i + 1 >= rx.size() || rx[i + 1] != '?') {
-                    return true; // захватывающая группа
+                    return true;// захватывающая группа
                 }
             }
         }
         return false;
     }
 
-    std::vector<std::string> RadixRouter::splitPath(const std::string& path) {
+    std::vector<std::string> RadixRouter::splitPath(const std::string &path) {
         std::vector<std::string> parts;
         parts.reserve(8);
         std::string token;
         std::stringstream ss(path);
 
         if (!path.empty() && path[0] == '/') {
-            ss.get(); // skip first '/'
+            ss.get();// skip first '/'
         }
 
         while (std::getline(ss, token, '/')) {
@@ -50,7 +50,7 @@ namespace usub::server::protocols::http {
     }
 
     std::vector<RadixRouter::Segment>
-    RadixRouter::parseSegments(const std::string& pattern, std::vector<std::string>& param_names) const {
+    RadixRouter::parseSegments(const std::string &pattern, std::vector<std::string> &param_names) const {
         std::vector<RadixRouter::Segment> segs;
         std::string token;
         bool escape = false;
@@ -74,7 +74,7 @@ namespace usub::server::protocols::http {
                 escape = false;
             }
 
-            const bool is_param    = actual.size() >= 2 && actual.front() == '{' && actual.back() == '}';
+            const bool is_param = actual.size() >= 2 && actual.front() == '{' && actual.back() == '}';
             const bool is_wildcard = (actual == "*" && token != "\\*");
 
             if (!is_param && !is_wildcard) {
@@ -87,7 +87,7 @@ namespace usub::server::protocols::http {
                 std::size_t colon = body.find(':');
 
                 std::string name = body.substr(0, colon);
-                std::string rx   = (colon == std::string::npos) ? "" : body.substr(colon + 1);
+                std::string rx = (colon == std::string::npos) ? "" : body.substr(colon + 1);
 
                 param_names.push_back(name);
                 segs.push_back({Segment::Par, {}, name, rx, std::nullopt});
@@ -99,12 +99,12 @@ namespace usub::server::protocols::http {
         return segs;
     }
 
-    void RadixRouter::applyConstraints(std::vector<Segment>& segs,
-                                       const std::unordered_map<std::string_view, const param_constraint*>& constraints) {
-        for (auto& seg : segs) {
+    void RadixRouter::applyConstraints(std::vector<Segment> &segs,
+                                       const std::unordered_map<std::string_view, const param_constraint *> &constraints) {
+        for (auto &seg: segs) {
             if (seg.kind != Segment::Par) continue;
 
-            const param_constraint* constraint = nullptr;
+            const param_constraint *constraint = nullptr;
             auto it = constraints.find(seg.name);
             if (it != constraints.end() && it->second) {
                 constraint = it->second;
@@ -120,10 +120,10 @@ namespace usub::server::protocols::http {
         }
     }
 
-    void RadixRouter::insert(RadixNode* node,
-                             const std::vector<Segment>& segs,
+    void RadixRouter::insert(RadixNode *node,
+                             const std::vector<Segment> &segs,
                              std::size_t idx,
-                             std::unique_ptr<Route>& route,
+                             std::unique_ptr<Route> &route,
                              bool has_trailing_slash) {
         if (idx == segs.size()) {
             node->route = std::move(route);
@@ -131,10 +131,10 @@ namespace usub::server::protocols::http {
             return;
         }
 
-        const Segment& cur = segs[idx];
+        const Segment &cur = segs[idx];
 
         if (cur.kind == Segment::Lit) {
-            auto& child = node->literal[cur.lit];
+            auto &child = node->literal[cur.lit];
             if (!child) child = std::make_unique<RadixNode>();
             insert(child.get(), segs, idx + 1, route, has_trailing_slash);
             return;
@@ -142,11 +142,8 @@ namespace usub::server::protocols::http {
 
         if (cur.kind == Segment::Par) {
             // Сливаем ребро только если совпадают и имя, и паттерн (через constraint)
-            for (ParamEdge& edge : node->param) {
-                if (edge.constraint && cur.constraint
-                    && edge.constraint->pattern == cur.constraint->pattern
-                    && edge.name == cur.name)
-                {
+            for (ParamEdge &edge: node->param) {
+                if (edge.constraint && cur.constraint && edge.constraint->pattern == cur.constraint->pattern && edge.name == cur.name) {
                     insert(edge.child.get(), segs, idx + 1, route, has_trailing_slash);
                     return;
                 }
@@ -159,8 +156,8 @@ namespace usub::server::protocols::http {
             edge.constraint = cur.constraint;
             // edge.pattern_str = cur.re;
 
-            node->param.push_back(std::move(edge)); // сначала добавляем
-            insert(node->param.back().child.get(), segs, idx + 1, route, has_trailing_slash); // потом уходим вниз
+            node->param.push_back(std::move(edge));                                          // сначала добавляем
+            insert(node->param.back().child.get(), segs, idx + 1, route, has_trailing_slash);// потом уходим вниз
             return;
         }
 
@@ -170,32 +167,76 @@ namespace usub::server::protocols::http {
         insert(node->wildcard.get(), segs, segs.size(), route, has_trailing_slash);
     }
 
-    Route& RadixRouter::addRoute(const std::set<std::string>& methods,
-                                 const std::string& pattern,
+    Route &RadixRouter::addRoute(const std::set<std::string> &methods,
+                                 const std::string &pattern,
                                  std::function<FunctionType> handler,
-                                 const std::unordered_map<std::string_view, const param_constraint*>& constraints) {
+                                 const std::unordered_map<std::string_view, const param_constraint *> &constraints) {
         std::vector<std::string> param_names;
         std::vector<Segment> segs = parseSegments(pattern, param_names);
 
         applyConstraints(segs, constraints);
         auto routePtr = std::make_unique<Route>(
-            methods, std::regex{}, param_names, std::move(handler),
-            methods.contains("*")
-        );
+                methods, std::regex{}, param_names, std::move(handler),
+                methods.contains("*"));
 
-        Route* rawPtr = routePtr.get();
+        Route *rawPtr = routePtr.get();
         const bool has_trailing_slash = !pattern.empty() && pattern.back() == '/';
         insert(root_.get(), segs, 0, routePtr, has_trailing_slash);
+
+        std::ostringstream methods_stream;
+        for (auto it = methods.begin(); it != methods.end(); ++it) {
+            if (it != methods.begin()) methods_stream << ',';
+            methods_stream << *it;
+        }
+
+        std::ostringstream path_stream;
+        path_stream << '/';
+        for (size_t i = 0; i < segs.size(); ++i) {
+            if (i) path_stream << '/';
+            const auto &s = segs[i];
+            switch (s.kind) {
+                case Segment::Lit:
+                    path_stream << s.lit;
+                    break;
+                case Segment::Par: {
+                    path_stream << '{' << s.name << '}';
+                    const param_constraint *pc = nullptr;
+                    if (auto it = constraints.find(s.name); it != constraints.end() && it->second) {
+                        pc = it->second;
+                    } else if (s.constraint) {
+                        pc = &(*s.constraint);
+                    }
+                    if (pc) {
+                        path_stream << '('
+                                    << "constraint_name:" << s.name
+                                    << "|constraint_desc:" << pc->description
+                                    << "|constraint_regex:" << pc->pattern
+                                    << ')';
+                    }
+                    break;
+                }
+                case Segment::Wild:
+                    path_stream << '*';
+                    break;
+            }
+        }
+        if (has_trailing_slash) path_stream << '/';
+
+        std::cout << "route methods: " << methods_stream.str() << "\n"
+                  << "path: " << path_stream.str() << "\n"
+                  << "hint: router.addHandler({\"" << methods_stream.str()
+                  << "\"}, \"" << pattern << "\", handlerFunction);\n"
+                  << std::endl;
 
         return *rawPtr;
     }
 
-    std::optional<std::pair<Route*, bool>>
-    RadixRouter::match(Request& request, std::string* error_description) {
+    std::optional<std::pair<Route *, bool>>
+    RadixRouter::match(Request &request, std::string *error_description) {
         const std::string path = request.getURL();
 
         std::vector<std::string> segs = splitPath(path);
-        Route* routePtr = nullptr;
+        Route *routePtr = nullptr;
         if (!matchIter(root_.get(), segs, request, routePtr, error_description) || !routePtr) {
             return std::nullopt;
         }
@@ -206,7 +247,7 @@ namespace usub::server::protocols::http {
         return std::make_pair(routePtr, methodOk);
     }
 
-    MiddlewareChain& RadixRouter::addMiddleware(MiddlewarePhase phase,
+    MiddlewareChain &RadixRouter::addMiddleware(MiddlewarePhase phase,
                                                 std::function<MiddlewareFunctionType> middleware) {
         if (phase == MiddlewarePhase::HEADER) {
             this->middleware_chain_.addMiddleware(phase, std::move(middleware));
@@ -216,28 +257,28 @@ namespace usub::server::protocols::http {
         return this->middleware_chain_;
     }
 
-    MiddlewareChain& RadixRouter::getMiddlewareChain() {
+    MiddlewareChain &RadixRouter::getMiddlewareChain() {
         return this->middleware_chain_;
     }
 
-    void RadixRouter::addErrorHandler(const std::string& error_code, std::function<FunctionType> function) {
+    void RadixRouter::addErrorHandler(const std::string &error_code, std::function<FunctionType> function) {
         this->error_page_handlers_.emplace(error_code, function);
     }
 
-    void RadixRouter::executeErrorChain(Request& request, Response& response) {
+    void RadixRouter::executeErrorChain(Request &request, Response &response) {
         if (this->error_page_handlers_.contains("Log")) {
             this->error_page_handlers_.at("Log")(request, response);
         }
-        std::string error = std::to_string((uint16_t)request.getState());
+        std::string error = std::to_string((uint16_t) request.getState());
         if (this->error_page_handlers_.contains(error)) {
             this->error_page_handlers_.at(error)(request, response);
         }
     }
 
-    void RadixRouter::parsePathPattern(const std::string& pathPattern,
-                                       std::regex& outRegex,
-                                       std::vector<std::string>& outParamNames,
-                                       const std::unordered_map<std::string_view, const param_constraint*>& constraints) const {
+    void RadixRouter::parsePathPattern(const std::string &pathPattern,
+                                       std::regex &outRegex,
+                                       std::vector<std::string> &outParamNames,
+                                       const std::unordered_map<std::string_view, const param_constraint *> &constraints) const {
         std::string regexPattern = "^";
         size_t position = 0;
 
@@ -255,7 +296,7 @@ namespace usub::server::protocols::http {
             char c = pathPattern[position];
 
             if (c == ' ') {
-                regexPattern += "(?:\\+|%20)"; // пробел как '+' или '%20'
+                regexPattern += "(?:\\+|%20)";// пробел как '+' или '%20'
                 position++;
             } else if (c == '{') {
                 size_t end = findMatchingBrace(pathPattern, position);
@@ -267,7 +308,7 @@ namespace usub::server::protocols::http {
                 std::string paramName;
                 std::string paramRegex;
                 if (colon != std::string::npos) {
-                    paramName  = paramContent.substr(0, colon);
+                    paramName = paramContent.substr(0, colon);
                     paramRegex = paramContent.substr(colon + 1);
                 } else {
                     paramName = paramContent;
@@ -283,52 +324,46 @@ namespace usub::server::protocols::http {
                 regexPattern += "(" + paramRegex + ")";
                 position = end + 1;
             } else {
-                appendEsc(c); // экранируем литералы
+                appendEsc(c);// экранируем литералы
                 position++;
             }
         }
 
         try {
             outRegex = std::regex(regexPattern, std::regex::ECMAScript | std::regex::optimize);
-        } catch (const std::regex_error& e) {
+        } catch (const std::regex_error &e) {
             throw std::runtime_error("Invalid regex pattern: " + regexPattern + " Error: " + std::string(e.what()));
         }
     }
 
-    Route& RadixRouter::addPlainStringHandler(const std::set<std::string>& method,
-                                              const std::string& pathPattern,
+    Route &RadixRouter::addPlainStringHandler(const std::set<std::string> &method,
+                                              const std::string &pathPattern,
                                               std::function<FunctionType> function) {
         return addRoute(method, pathPattern, std::move(function));
     }
 
-    Route& RadixRouter::addHandler(const std::set<std::string>& method,
-                                   const std::string& pathPattern,
+    Route &RadixRouter::addHandler(std::string_view method,
+                                   const std::string &pathPattern,
                                    std::function<FunctionType> function) {
-        return addRoute(method, pathPattern, std::move(function));
-    }
-
-    Route& RadixRouter::addHandler(std::string_view method,
-                                   const std::string& pathPattern,
-                                   std::function<FunctionType> function) {
-        std::set<std::string> method_set{ std::string(method) };
+        std::set<std::string> method_set{std::string(method)};
         return addRoute(method_set, pathPattern, std::move(function));
     }
 
-    Route& RadixRouter::addHandler(const std::set<std::string>& method,
-                                   const std::string& pathPattern,
+    Route &RadixRouter::addHandler(const std::set<std::string> &method,
+                                   const std::string &pathPattern,
                                    std::function<FunctionType> function,
-                                   std::unordered_map<std::string_view, const param_constraint*>&& constraints) {
+                                   std::unordered_map<std::string_view, const param_constraint *> &&constraints) {
         return addRoute(method, pathPattern, std::move(function), constraints);
     }
 
     // ---- Рекурсивный поиск с бэктрекингом ----------------------------------
 
-    bool RadixRouter::matchDFS(RadixNode* node,
-                               const std::vector<std::string>& segs,
+    bool RadixRouter::matchDFS(RadixNode *node,
+                               const std::vector<std::string> &segs,
                                std::size_t idx,
-                               Request& req,
-                               Route*& out,
-                               std::string* last_error) {
+                               Request &req,
+                               Route *&out,
+                               std::string *last_error) {
         if (idx == segs.size()) {
             if (node->route) {
                 const bool req_has_trailing = !req.getURL().empty() && req.getURL().back() == '/';
@@ -340,7 +375,7 @@ namespace usub::server::protocols::http {
             return false;
         }
 
-        const std::string& cur = segs[idx];
+        const std::string &cur = segs[idx];
 
         // 1) Литерал
         if (auto lit = node->literal.find(cur); lit != node->literal.end()) {
@@ -351,7 +386,7 @@ namespace usub::server::protocols::http {
 
         // 2) Параметры — пробуем все подходящие, БЭКТРЕКИНГ
         std::string local_error;
-        for (ParamEdge& edge : node->param) {
+        for (ParamEdge &edge: node->param) {
             if (edge.regex && std::regex_match(cur, *edge.regex)) {
                 // save old value if present
                 auto prev_it = req.uri_params.find(edge.name);
@@ -366,7 +401,8 @@ namespace usub::server::protocols::http {
 
                 // backtrack
                 if (prev_value) req.uri_params[edge.name] = *prev_value;
-                else req.uri_params.erase(edge.name);
+                else
+                    req.uri_params.erase(edge.name);
             } else if (last_error) {
                 local_error = edge.constraint ? edge.constraint->description
                                               : ("Invalid value for parameter: " + edge.name);
@@ -393,11 +429,11 @@ namespace usub::server::protocols::http {
         return false;
     }
 
-    bool RadixRouter::matchIter(RadixNode* node,
-                                const std::vector<std::string>& segs,
-                                Request& req,
-                                Route*& out,
-                                std::string* last_error) {
+    bool RadixRouter::matchIter(RadixNode *node,
+                                const std::vector<std::string> &segs,
+                                Request &req,
+                                Route *&out,
+                                std::string *last_error) {
         return matchDFS(node, segs, 0, req, out, last_error);
     }
 
@@ -410,12 +446,12 @@ namespace usub::server::protocols::http {
         return buf.str();
     }
 
-    void RadixRouter::printNode(const RadixNode* node,
-                                std::ostringstream& buf,
-                                const std::string& prefix) const {
+    void RadixRouter::printNode(const RadixNode *node,
+                                std::ostringstream &buf,
+                                const std::string &prefix) const {
         size_t total = node->literal.size() + node->param.size() + (node->wildcard ? 1 : 0), idx = 0;
 
-        for (auto& [lbl, ptr] : node->literal) {
+        for (auto &[lbl, ptr]: node->literal) {
             bool last = (++idx == total);
             buf << prefix
                 << (last ? "└─" : "├─")
@@ -425,7 +461,7 @@ namespace usub::server::protocols::http {
             printNode(ptr.get(), buf, prefix + (last ? "   " : "│  "));
         }
 
-        for (auto& pe : node->param) {
+        for (auto &pe: node->param) {
             bool last = (++idx == total);
             std::string lbl = ":" + pe.name + (pe.constraint ? "(" + pe.constraint->pattern + ")" : "");
             buf << prefix
@@ -448,4 +484,4 @@ namespace usub::server::protocols::http {
         }
     }
 
-} // namespace usub::server::protocols::http
+}// namespace usub::server::protocols::http

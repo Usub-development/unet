@@ -655,6 +655,19 @@ usub::server::protocols::http::Response &usub::server::protocols::http::Response
     return *this;
 }
 
+
+#ifdef _WIN32// TODO: Temporary solution
+#include <fcntl.h>
+#include <io.h>
+
+// Provide POSIX-style aliases so the rest of your code remains unchanged
+#define open _open
+#define close _close
+#define read _read
+#define O_RDONLY _O_RDONLY
+#endif
+
+
 usub::server::protocols::http::Response &usub::server::protocols::http::Response::setFile(const std::string &filename, const std::string &content_type) {
     this->helper_.offset_ = 0;
     this->fd_ = open(filename.c_str(), O_RDONLY);

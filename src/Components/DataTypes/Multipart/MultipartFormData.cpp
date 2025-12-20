@@ -54,19 +54,34 @@ std::expected<void, std::string> MultipartFormData::parse(std::string input) {
                     if (eq == std::string::npos) {
                     	continue;
                     }
-                    std::string keyPart = seg.substr(0, eq);
-                    std::string valPart = seg.substr(eq + 1);
-                    usub::utils::trim(keyPart);
-                    usub::utils::trim(valPart);
-                    disp.emplace(std::move(usub::utils::toLower(keyPart)), std::move(valPart));
+					std::string keyPart = seg.substr(0, eq);
+					std::string valPart = seg.substr(eq + 1);
+					
+					usub::utils::trim(keyPart);
+					usub::utils::trim(valPart);
+					
+					if (valPart.size() >= 2 &&
+					    valPart.front() == '"' &&
+					    valPart.back()  == '"')
+					{
+					    valPart = valPart.substr(1, valPart.size() - 2);
+					}
+					
+					disp.emplace(
+					    usub::utils::toLower(keyPart),
+					    std::move(valPart)
+					);
                 }
 
                 std::string ctype = rawContentType.value_or("text/plain; charset=US-ASCII");
 
-                std::string content = dataBuffer.str();
-                if (!content.empty() && content.back() == '\r') {
-                	content.pop_back();
-                }
+				std::string content = dataBuffer.str();
+				
+				if (!content.empty() && content.back() == '\n')
+				    content.pop_back();
+				if (!content.empty() && content.back() == '\r')
+				    content.pop_back();
+
 
 				Part part{
 					std::move(ctype),
@@ -275,7 +290,7 @@ std::string MultipartFormData::string() const
     for (const auto &[fieldName, partsVec] : parts_by_name_) {
         for (const auto &part : partsVec) {
             out << delim << "\r\n";
-
+			// TODO: fix quoted string
             out << "Content-Disposition: form-data";
             for (const auto &[k, v] : part.disposition)
                 out << "; " << k << "=\"" << v << "\"";
@@ -298,3 +313,5 @@ MultipartFormData& MultipartFormData::setBoundary(std::string boundary) {
 	this->boundary_ = boundary;
 	return *this;
 }
+
+
