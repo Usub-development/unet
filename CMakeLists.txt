@@ -187,13 +187,26 @@ if(BUILD_EXAMPLES)
 endif()
 
 # ========================================
-# ======= BUILDING TESTS =============
+# ======= BUILDING NEW IMPLEMENTATION & TESTS =============
 # ========================================
 
-# PunycodeEncoding tests
+option(BUILD_NEW_IMPL "Build the new form-data implementation and tests" OFF)
 
-option(BUILD_TESTS "Build and run tests" OFF)
+if(BUILD_NEW_IMPL)
+    # Build the new implementation as a separate library so it can be tested independently
+    add_library(unet_form_data STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/new-src/mime/form_data/generic.cpp
+    )
 
-if(BUILD_TESTS)
-    add_subdirectory(tests)
+    target_include_directories(unet_form_data PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/new-include
+    )
+
+    # Link dependencies that the new implementation may need (reuse existing fetches)
+    target_link_libraries(unet_form_data PUBLIC usub::uvent)
+
+    # Add test directory that exercises the new implementation
+    add_subdirectory(new-test)
 endif()
+
+# ========================================
