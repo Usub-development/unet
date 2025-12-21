@@ -82,6 +82,25 @@ void usub::server::protocols::http::Request::setState(const REQUEST_STATE &state
 std::string usub::server::protocols::http::Request::getBody() {
     return this->body_;
 }
+std::string usub::server::protocols::http::Response::getBodyHex() const {
+    return getBodyHex(this->body_.size());
+}
+
+std::string usub::server::protocols::http::Response::getBodyHex(size_t max_bytes) const {
+    static constexpr char H[] = "0123456789ABCDEF";
+
+    const size_t n = std::min(max_bytes, this->body_.size());
+    std::string out;
+    out.reserve(n * 2);
+
+    const unsigned char *p = reinterpret_cast<const unsigned char *>(this->body_.data());
+    for (size_t i = 0; i < n; ++i) {
+        unsigned char b = p[i];
+        out.push_back(H[b >> 4]);
+        out.push_back(H[b & 0x0F]);
+    }
+    return out;
+}
 
 std::string::const_iterator usub::server::protocols::http::Request::parseHTTP1_0(const std::string &request, std::string::const_iterator start_pos) {
     std::string::const_iterator rv = this->parseHTTP1_1(request, start_pos);

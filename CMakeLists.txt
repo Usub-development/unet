@@ -11,6 +11,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -fpic")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
+option(UNET_USE_UJSON "Enable ujson support (getAsJson<T>)" OFF)
 #set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer" CACHE STRING "Debug flags" FORCE)
 #set(CMAKE_C_FLAGS_DEBUG "-g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer" CACHE STRING "Debug flags" FORCE)
 #set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-fsanitize=address,undefined" CACHE STRING "Linker flags" FORCE)
@@ -30,6 +31,16 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(uvent)
+
+if (UNET_USE_UJSON)
+    FetchContent_Declare(
+            ujson
+            GIT_REPOSITORY https://github.com/Usub-development/ujson.git
+            GIT_TAG main
+            FIND_PACKAGE_ARGS
+    )
+    FetchContent_MakeAvailable(ujson)
+endif()
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
@@ -124,6 +135,16 @@ else()
             usub::uvent
     )
 endif ()
+
+target_compile_definitions(server PUBLIC
+        $<$<BOOL:${UNET_USE_UJSON}>:UNET_USE_UJSON>
+)
+
+if (UNET_USE_UJSON)
+    target_link_libraries(server PUBLIC
+            usub::ujson
+    )
+endif()
 
 # --------------------
 # INSTALL

@@ -25,6 +25,10 @@
 #include "utils/utils.h"
 #include "uvent/tasks/Awaitable.h"
 
+#if defined(UNET_USE_UJSON) && UNET_USE_UJSON
+#include <ujson/ujson.h>
+#endif
+
 
 namespace usub::server::protocols::http {
 
@@ -449,6 +453,21 @@ namespace usub::server::protocols::http {
          */
         std::string getBody();
 
+#if defined(UNET_USE_UJSON) && UNET_USE_UJSON
+        /**
+         * @brief Parse request body as JSON into type @p T using ujson.
+         *
+         * @tparam T Target type.
+         * @tparam Strict If true, unknown fields are treated as error (strict mode).
+         * @return ujson::Result<T> (expected-like): on success contains T, otherwise contains ujson::Error.
+         */
+        template<class T, bool Strict = false>
+        [[nodiscard]] auto getAsJson() const
+                -> decltype(ujson::try_parse<T, Strict>(std::declval<std::string_view>())) {
+            return ujson::try_parse<T, Strict>(std::string_view{this->body_});
+        }
+#endif
+
         /**
          * @brief Parses the query parameters from the URI.
          *
@@ -761,6 +780,43 @@ namespace usub::server::protocols::http {
         const std::string &getBody() const;
 
         /**
+         * @brief Get response body encoded as hexadecimal string.
+         *
+         * Each byte of the body is converted to two uppercase hexadecimal
+         * characters (00–FF). The resulting string contains no separators.
+         *
+         * @return std::string Hex-encoded body. Empty if body is empty.
+         */
+        [[nodiscard]] std::string getBodyHex() const;
+
+        /**
+         * @brief Get response body encoded as hexadecimal string with size limit.
+         *
+         * Encodes at most @p max_bytes bytes from the beginning of the body.
+         * Useful for logging or debugging large payloads.
+         *
+         * @param max_bytes Maximum number of bytes to encode from the body.
+         * @return std::string Hex-encoded body prefix. Empty if body is empty
+         *         or @p max_bytes is zero.
+         */
+        [[nodiscard]] std::string getBodyHex(size_t max_bytes) const;
+
+#if defined(UNET_USE_UJSON) && UNET_USE_UJSON
+        /**
+         * @brief Parse response body as JSON into type @p T using ujson.
+         *
+         * @tparam T Target type.
+         * @tparam Strict If true, unknown fields are treated as error (strict mode).
+         * @return ujson::Result<T> (expected-like): on success contains T, otherwise contains ujson::Error.
+         */
+        template<class T, bool Strict = false>
+        [[nodiscard]] auto getAsJson() const
+                -> decltype(ujson::try_parse<T, Strict>(std::declval<std::string_view>())) {
+            return ujson::try_parse<T, Strict>(std::string_view{this->body_});
+        }
+#endif
+
+        /**
          * @brief Initiates the coroutine to send the response.
          *
          * @return usub::uvent::task::AwaitableBase* Pointer to the awaitable coroutine.
@@ -943,18 +999,19 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                 break;
             }
             case RESPONSE_STATE::DATA_CONTENT_LENGTH: {
-            content_length:
-                if (this->line_size_ <= this->helper_.size_) {
-                    this->body_.push_back(*c);
-                    ++this->line_size_;
-                    if (this->line_size_ == this->helper_.size_ - 1) {
-                        this->state_ = RESPONSE_STATE::FINISHED;
-                        return ++c;
+                content_length:
+                    if (this->line_size_ < this->helper_.size_) {
+                        this->body_.push_back(*c);
+                        ++this->line_size_;
+
+                        if (this->line_size_ == this->helper_.size_) {
+                            this->state_ = RESPONSE_STATE::FINISHED;
+                            return ++c;
+                        }
+                    } else {
+                        this->state_ = RESPONSE_STATE::ERROR;
+                        return c;
                     }
-                } else {
-                    this->state_ = RESPONSE_STATE::ERROR;
-                    return c;// too much data
-                }
                 break;
             }
             case RESPONSE_STATE::DATA_CHUNKED_SIZE:
