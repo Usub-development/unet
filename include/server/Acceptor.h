@@ -45,9 +45,9 @@ namespace usub::server {
 
             while (true) {
                 buffer.clear();
-                
+
                 ssize_t rdsz = co_await socket.async_read(buffer, MAX_READ_SIZE);
-                
+
                 if (rdsz <= 0) {
                     break;
                 }
@@ -68,11 +68,11 @@ namespace usub::server {
                 while (!response.isSent() && request.getState() >= protocols::http::REQUEST_STATE::FINISHED) {
                     const std::string responseString = response.pull();
 
-                    
+
                     ssize_t wrsz = co_await socket.async_write((uint8_t *) responseString.data(), responseString.size());
-                    
+
                     if (wrsz <= 0) {
-                        
+
                         break;
                     }
 #ifdef UVENT_DEBUG
@@ -98,7 +98,6 @@ namespace usub::server {
                     else if (http10_no_keep_alive)
                         spdlog::info("Closing connection: HTTP/1.0 and no 'Connection: keep-alive'");
 #endif
-                    std::cout << "Closing connection" << std::endl;
                     socket.shutdown();
                     co_return;
                 }

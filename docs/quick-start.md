@@ -27,7 +27,7 @@ Create a `main.cpp`:
 
 using namespace usub::server;
 
-ServerHandler<void> handlerFunction(protocols::http::Request &request,
+ServerHandler handlerFunction(protocols::http::Request &request,
                      protocols::http::Response &response) {
     std::cout << "Matched: " << request.getURL() << std::endl;
     response.setStatus(200)
@@ -77,3 +77,4 @@ Hello World from Webserver!
 
 - Learn how to work with [requests/responses](request-response.md)
 - Learn how to add [middleware](middlewares.md).
+

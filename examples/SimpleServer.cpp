@@ -27,6 +27,14 @@ std::string getFileExtension(const std::string &fileName) {
 
 uint64_t request_cntr{};
 
+struct TestInClass {
+    bool headerMiddle(const usub::server::protocols::http::Request &request, usub::server::protocols::http::Response &response) {
+        std::cout << "header middleware in class reached" << std::endl;
+        response.setStatus(401);
+        return false;
+    }
+};
+
 bool headerMiddle(const usub::server::protocols::http::Request &request, usub::server::protocols::http::Response &response) {
     std::cout << "header middleware reached" << std::endl;
     return true;
@@ -88,7 +96,7 @@ ServerHandler handlerFunction(usub::server::protocols::http::Request &request, u
 #include "../include/Components/Compression/gzip.h"// FOR TESTING
 #include <csignal>
 #include <stdexcept>
-#include <unistd.h>
+// #include <unistd.h>
 
 void handle_alarm(int sig) {
     std::cerr << "Program timed out after 200 seconds. Exiting...\n";
@@ -121,20 +129,22 @@ int main() {
     //    router.addPlainStringHandler({"GET"}, "/ping", handlerFunction);
     // router.addHandler({"*"}, "/deposit/*", handlerFunction);
 
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = SIG_IGN;
-    sigaction(SIGPIPE, &sa, nullptr);
-    signal(SIGALRM, handle_alarm);
+    // struct sigaction sa;
+    // memset(&sa, 0, sizeof(sa));
+    // sa.sa_handler = SIG_IGN;
+    // sigaction(SIGPIPE, &sa, nullptr);
+    // signal(SIGALRM, handle_alarm);
 
+    // usub::server::Server server_no_ssl("../config/https.toml");
     usub::server::Server server_no_ssl("../config/https.toml");
     server_no_ssl.addMiddleware(usub::server::protocols::http::MiddlewarePhase::HEADER, globalMiddle);
 
     // usub::server::Server server("/root/projects/serverMoving/confSSL.toml");
     // server_no_ssl.handle("*", R"(/.*)", handlerFunction).addMiddleware(usub::server::protocols::http::MiddlewarePhase::HEADER, headerMiddle).addMiddleware(usub::server::protocols::http::MiddlewarePhase::RESPONSE, responseMiddle);
-
+    TestInClass tic;
     server_no_ssl.handle({"*"}, R"(/hello)", handlerFunction)
             .addMiddleware(usub::server::protocols::http::MiddlewarePhase::HEADER, headerMiddle)
+            .addMiddleware(usub::server::protocols::http::MiddlewarePhase::HEADER, std::bind(&TestInClass::headerMiddle, &tic, std::placeholders::_1, std::placeholders::_2))
             .addMiddleware(usub::server::protocols::http::MiddlewarePhase::RESPONSE, responseMiddle);
     server_no_ssl.handle({"GET"},
                          "/deposit/update/{id}/",//  last / is trailing

@@ -13,6 +13,10 @@
 
 #include "utils/TypeID.h"
 
+#ifdef ERROR
+#undef ERROR
+#endif
+
 namespace usub::server::component {
 
     // Base class for all decoders
@@ -22,7 +26,7 @@ namespace usub::server::component {
             MORE_DATA_NEEDED = 0,
             PARTIAL = 1,
             COMPLETE = 2,
-            ERROR = 3,
+            ERROR = 3
         };
 
     protected:

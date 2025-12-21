@@ -78,29 +78,58 @@ namespace usub::server::protocols::http {
                 case REQUEST_STATE::PRE_HEADERS:
                     middleware_rv = this->endpoint_handler_->getMiddlewareChain().execute(MiddlewarePhase::SETTINGS, this->request_, this->response_);
                     if (!middleware_rv) {
+                        this->request_.setState(REQUEST_STATE::BAD_REQUEST);
                         co_return;
                     }
+
+                    middleware_rv = this->matched_route_->middleware_chain.execute(MiddlewarePhase::SETTINGS, this->request_, this->response_);
+                    if (!middleware_rv) {
+                        this->request_.setState(REQUEST_STATE::BAD_REQUEST);
+                        co_return;
+                    }
+
                     goto retry_parse;
                 case REQUEST_STATE::HEADERS_PARSED:
                     middleware_rv = this->endpoint_handler_->getMiddlewareChain().execute(MiddlewarePhase::HEADER, this->request_, this->response_);
                     if (!middleware_rv) {
+                        this->request_.setState(REQUEST_STATE::BAD_REQUEST);
                         co_return;
                     }
+                    middleware_rv = this->matched_route_->middleware_chain.execute(MiddlewarePhase::HEADER, this->request_, this->response_);
+                    if (!middleware_rv) {
+                        this->request_.setState(REQUEST_STATE::BAD_REQUEST);
+                        co_return;
+                    }
+
                     goto retry_parse;
                 case REQUEST_STATE::DATA_FRAGMENT:
                     middleware_rv = this->endpoint_handler_->getMiddlewareChain().execute(MiddlewarePhase::BODY, this->request_, this->response_);
                     if (!middleware_rv) {
+                        this->request_.setState(REQUEST_STATE::BAD_REQUEST);
                         co_return;
                     }
+                    middleware_rv = this->matched_route_->middleware_chain.execute(MiddlewarePhase::BODY, this->request_, this->response_);
+                    if (!middleware_rv) {
+                        this->request_.setState(REQUEST_STATE::BAD_REQUEST);
+                        co_return;
+                    }
+
                     goto retry_parse;
                 case REQUEST_STATE::FINISHED:
 
                     co_await this->matched_route_->handler(this->request_, this->response_);
+                    middleware_rv = this->endpoint_handler_->getMiddlewareChain().execute(MiddlewarePhase::RESPONSE, this->request_, this->response_);
+                    if (!middleware_rv) {
+                        this->request_.setState(REQUEST_STATE::BAD_REQUEST);
+                        co_return;
+                    }
+
                     if (!this->response_.isSent()) {
                         middleware_rv = this->matched_route_->middleware_chain.execute(MiddlewarePhase::RESPONSE, this->request_, this->response_);
                     }
                     this->matched_route_ = {};
                     if (!middleware_rv || this->response_.isSent()) {
+                        this->request_.setState(REQUEST_STATE::BAD_REQUEST);
                         co_return;
                     }
                     break;
