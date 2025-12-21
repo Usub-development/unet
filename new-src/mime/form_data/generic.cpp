@@ -108,7 +108,7 @@ namespace usub::unet::mime::multipart {
                     if (!content.empty() && content.back() == '\r')
                         content.pop_back();
 
-                        Part part{
+                    Part part{
                             std::move(ctype),
                             std::move(disp),
                             std::move(content),
@@ -126,12 +126,12 @@ namespace usub::unet::mime::multipart {
                     extra_Headers.clear();
                 }
 
-                    if (line == "--" + detectedBoundary + "--") {
-                        break;
-                    }
+                if (line == "--" + detectedBoundary + "--") {
+                    break;
+                }
 
-                    readingData = false;
-                    continue;
+                readingData = false;
+                continue;
             }
 
             if (!readingData && line.find("Content-Disposition:") == 0) {
@@ -155,4 +155,4 @@ namespace usub::unet::mime::multipart {
         return {};
     }
 
-}
+}// namespace usub::unet::mime::multipart

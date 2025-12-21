@@ -4,7 +4,8 @@
 
 namespace usub::unet::http {
 
-    class Response {
+    struct response {
+        MessagePolicy policy{};
     };
 
 }// namespace usub::unet::http

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 // The URI Is much simpler then I thought initially. No need to overcomplicate it.
@@ -16,12 +17,12 @@
      urn:example:animal:ferret:nose
 */
 
-namespace usub::unet::component {
+namespace usub::unet::uri {
 
     struct Authority {
         std::string userinfo;// Usually empty
         std::string host;
-        uint16_t port = 0;
+        std::uint16_t port = 0;
     };
 
     struct URI {
@@ -32,4 +33,4 @@ namespace usub::unet::component {
         std::string fragment;
     };
 
-}// namespace usub::unet::component
+}// namespace usub::unet::uri

@@ -190,4 +190,12 @@ namespace usub::unet::http {
         std::size_t max_body_size = 8 * 1024 * 1024;
     };
 
+    enum class VERSION : uint8_t {
+        HTTP_0_9 = 9,
+        HTTP_1_0 = 10,
+        HTTP_1_1 = 11,
+        HTTP_2_0 = 20,
+        HTTP_3_0 = 30,
+    };
+
 }// namespace usub::unet::http
