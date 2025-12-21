@@ -4,5 +4,7 @@
 
 namespace usub::unet::http {
 
+    class Response {
+    };
 
 }// namespace usub::unet::http

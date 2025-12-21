@@ -1,18 +1,15 @@
 #pragma once
-#include <functional>
+
 #include <memory>
 #include <optional>
 #include <regex>
-#include <set>
-#include <stack>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "unet/http/router/route.hpp"
 
-#include "Protocols/HTTP/RouterCommon.h"
-
-namespace usub::server::protocols::http {
+namespace usub::unet::http::router {
 
     struct ParamEdge {
         std::string name;               // имя параметра (id:)
@@ -20,7 +17,6 @@ namespace usub::server::protocols::http {
         std::unique_ptr<RadixNode> child;
         std::optional<param_constraint> constraint;
     };
-
 
     struct param_constraint {
         std::string pattern;
@@ -40,9 +36,9 @@ namespace usub::server::protocols::http {
         std::unique_ptr<Route> route = nullptr;
     };
 
-    class RadixRouter {
+    class Radix {
     public:
-        RadixRouter() : root_(std::make_unique<RadixNode>()) {}
+        Radix() : root_(std::make_unique<RadixNode>()) {}
 
         Route &addRoute(const std::set<std::string> &methods,
                         const std::string &pattern,
@@ -122,5 +118,4 @@ namespace usub::server::protocols::http {
                        std::ostringstream &buf,
                        const std::string &prefix) const;
     };
-
-}// namespace usub::server::protocols::http
+}// namespace usub::unet::http::router

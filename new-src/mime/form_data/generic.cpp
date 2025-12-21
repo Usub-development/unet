@@ -1,7 +1,42 @@
 #include "unet/mime/multipart/form_data/generic.hpp"
 #include <sstream>
+#include <stdexcept>
+#include <utility>
 
 namespace usub::unet::mime::multipart {
+
+    FormData::FormData(std::string boundary) : boundary_(std::move(boundary)) {}
+
+    FormData::FormData(std::string boundary, std::string raw_data) : boundary_(std::move(boundary)) {
+        auto res = parse(std::move(raw_data));
+        if (!res) throw std::runtime_error(res.error());
+    }
+
+    std::vector<Part> &FormData::operator[](const std::string &name) { return this->parts_by_name_[name]; }
+
+    const std::vector<Part> &FormData::operator[](const std::string &name) const {
+        static const std::vector<Part> empty_vec;
+        auto it = this->parts_by_name_.find(name);
+        return it == this->parts_by_name_.end() ? empty_vec : it->second;
+    }
+
+    std::vector<Part> &FormData::at(const std::string &name) { return this->parts_by_name_.at(name); }
+    const std::vector<Part> &FormData::at(const std::string &name) const { return this->parts_by_name_.at(name); }
+
+    bool FormData::contains(const std::string &name) const { return this->parts_by_name_.find(name) != this->parts_by_name_.end(); }
+
+    std::size_t FormData::size() const { return this->parts_by_name_.size(); }
+    bool FormData::empty() const { return this->parts_by_name_.empty(); }
+    void FormData::clear() { this->parts_by_name_.clear(); }
+    std::size_t FormData::erase(const std::string &name) { return this->parts_by_name_.erase(name); }
+
+    FormData::iterator FormData::begin() { return this->parts_by_name_.begin(); }
+    FormData::iterator FormData::end() { return this->parts_by_name_.end(); }
+    FormData::const_iterator FormData::begin() const { return this->parts_by_name_.begin(); }
+    FormData::const_iterator FormData::end() const { return this->parts_by_name_.end(); }
+
+    const FormData::parts_map_t &FormData::parts_by_name() const { return this->parts_by_name_; }
+    FormData::parts_map_t &FormData::parts_by_name() { return this->parts_by_name_; }
 
     std::expected<void, std::string> FormData::parse(std::string input) {
         std::istringstream stream(input);
@@ -73,7 +108,7 @@ namespace usub::unet::mime::multipart {
                     if (!content.empty() && content.back() == '\r')
                         content.pop_back();
 
-                    Part part{
+                        Part part{
                             std::move(ctype),
                             std::move(disp),
                             std::move(content),
@@ -91,12 +126,12 @@ namespace usub::unet::mime::multipart {
                     extra_Headers.clear();
                 }
 
-                if (line == "--" + detectedBoundary + "--") {
-                    break;// final boundary
-                }
+                    if (line == "--" + detectedBoundary + "--") {
+                        break;
+                    }
 
-                readingData = false;
-                continue;
+                    readingData = false;
+                    continue;
             }
 
             if (!readingData && line.find("Content-Disposition:") == 0) {
@@ -120,4 +155,4 @@ namespace usub::unet::mime::multipart {
         return {};
     }
 
-}// namespace usub::unet::mime::multipart
+}

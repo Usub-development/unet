@@ -12,7 +12,7 @@ namespace usub::unet::utils {
         };
         CODE error_code;
         std::string message;
-        std::array<const char *, 256> tail;
+        std::array<char, 256> tail;
     };
 
 }// namespace usub::unet::utils
