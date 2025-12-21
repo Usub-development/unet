@@ -202,6 +202,10 @@ namespace usub::server::protocols::http {
         usub::server::protocols::http::Headers &getHeaders() noexcept;
         const usub::server::protocols::http::Headers &getHeaders() const noexcept;
 
+        usub::server::protocols::http::Headers &addHeader(std::string_view key, std::string_view value) {
+            this->headers_.addHeader(key, value);
+            return this->headers_;
+        }
 
         /**
          * @brief Retrieves a reference to the message data as a vector of unsigned characters.
@@ -368,6 +372,11 @@ namespace usub::server::protocols::http {
          */
         std::string &getRequestMethod();
         const std::string &getRequestMethod() const;
+
+        Request &setRequestMethod(const std::string &method) {
+            this->method_token_ = method;
+            return *this;
+        }
 
         /**
          * @brief Retrieves the current state of the request parsing.
@@ -908,7 +917,7 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                 }
                 break;
             }
-            case RESPONSE_STATE::DATA_CONTENT_LENGTH:{
+            case RESPONSE_STATE::DATA_CONTENT_LENGTH: {
             content_length:
                 if (this->line_size_ <= this->helper_.size_) {
                     this->body_.push_back(*c);
