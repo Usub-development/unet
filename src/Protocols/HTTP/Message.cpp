@@ -655,6 +655,18 @@ usub::server::protocols::http::Response &usub::server::protocols::http::Response
     return *this;
 }
 
+uint16_t usub::server::protocols::http::Response::getStatus() const {
+    try {
+        return static_cast<uint16_t>(std::stoul(this->status_code_));
+    } catch (...) {
+        return 0;
+    }
+}
+
+const std::string &usub::server::protocols::http::Response::getBody() const {
+    return this->body_;
+}
+
 
 #ifdef _WIN32// TODO: Temporary solution
 #include <fcntl.h>
@@ -1445,14 +1457,25 @@ usub::uvent::task::Awaitable<bool> usub::server::protocols::http::Request::parse
     co_return true;
 }
 
-void usub::server::protocols::http::Request::setUri(const std::string &uri) { // TODO: this is just not correct, redo
+void usub::server::protocols::http::Request::setUri(const std::string &uri) {// TODO: this is just not correct, redo
     this->urn_.getPath() = uri;
+}
+
+usub::server::protocols::http::Request &usub::server::protocols::http::Request::setBody(const std::string &data, const std::string &content_type) {
+    this->body_ = data;
+    this->helper_.offset_ = 0;
+    this->helper_.size_ = data.size();
+    this->headers_.addHeader<usub::server::protocols::http::Request>(std::string("Content-Length"), std::to_string(data.size()));
+    if (!content_type.empty()) {
+        this->headers_.addHeader<usub::server::protocols::http::Request>(std::string("Content-Type"), std::string(content_type));
+    }
+    return *this;
 }
 
 
 std::string usub::server::protocols::http::Request::string() {
     // Build request line
-    const std::string& method = this->method_token_.empty() ? static_cast<const std::string&>("GET") : this->method_token_;
+    const std::string &method = this->method_token_.empty() ? static_cast<const std::string &>("GET") : this->method_token_;
     std::string target;
 
     // Prefer full URL if available, fallback to path, default to "/"
@@ -1467,13 +1490,19 @@ std::string usub::server::protocols::http::Request::string() {
     }
 
     // Version to string
-    const char* version_str = "HTTP/1.1";
+    const char *version_str = "HTTP/1.1";
     switch (this->http_version_) {
-        case VERSION::HTTP_1_0: version_str = "HTTP/1.0"; break;
+        case VERSION::HTTP_1_0:
+            version_str = "HTTP/1.0";
+            break;
         case VERSION::HTTP_1_1:
         case VERSION::HTTP_1_X:
-        case VERSION::NONE:     version_str = "HTTP/1.1"; break;
-        default:                version_str = "HTTP/1.1"; break;
+        case VERSION::NONE:
+            version_str = "HTTP/1.1";
+            break;
+        default:
+            version_str = "HTTP/1.1";
+            break;
     }
 
     std::string out;
@@ -1488,14 +1517,14 @@ std::string usub::server::protocols::http::Request::string() {
     bool has_content_length = false;
 
     // Write existing headers and detect Host/Content-Length
-    for (const auto& kv : this->headers_) { // assumes Headers provides STL-like iteration
-        const auto& key = kv.first;
-        const auto& values = kv.second;
+    for (const auto &kv: this->headers_) {// assumes Headers provides STL-like iteration
+        const auto &key = kv.first;
+        const auto &values = kv.second;
 
         if (key == "host") has_host = true;
         if (key == "content-length") has_content_length = true;
 
-        for (const auto& v : values) {
+        for (const auto &v: values) {
             out.append(key).append(": ").append(v).append("\r\n");
         }
     }

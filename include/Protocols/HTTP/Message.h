@@ -113,6 +113,7 @@ namespace usub::server::protocols::http {
         DATA_CHUNKED = 9,
         ERROR = 10,
         FINISHED = 11,
+        DATA_CHUNKED_CRLF = 12,
         SENDING = 50,
         SENDING_CONTENT_LENGTH = 51,
         SENDING_CHUNKED = 52,
@@ -201,11 +202,6 @@ namespace usub::server::protocols::http {
          */
         usub::server::protocols::http::Headers &getHeaders() noexcept;
         const usub::server::protocols::http::Headers &getHeaders() const noexcept;
-
-        usub::server::protocols::http::Headers &addHeader(std::string_view key, std::string_view value) {
-            this->headers_.addHeader(key, value);
-            return this->headers_;
-        }
 
         /**
          * @brief Retrieves a reference to the message data as a vector of unsigned characters.
@@ -378,6 +374,11 @@ namespace usub::server::protocols::http {
             return *this;
         }
 
+        usub::server::protocols::http::Headers &addHeader(std::string_view key, std::string_view value) {
+            this->headers_.addHeader<usub::server::protocols::http::Request>(std::string(key), std::string(value));
+            return this->headers_;
+        }
+
         /**
          * @brief Retrieves the current state of the request parsing.
          *
@@ -395,6 +396,15 @@ namespace usub::server::protocols::http {
          * @param uri The URI string to set.
          */
         void setUri(const std::string &uri);
+
+        /**
+         * @brief Sets the request body and optional content type.
+         *
+         * @param data The body data to set.
+         * @param content_type Optional content type string.
+         * @return Request& Reference to this request.
+         */
+        Request &setBody(const std::string &data, const std::string &content_type = "");
 
         /**
          * @brief Sets the GET parameters of the request.
@@ -737,6 +747,20 @@ namespace usub::server::protocols::http {
         void clear();
 
         /**
+         * @brief Get numeric status code for the response.
+         *
+         * @return uint16_t Numeric HTTP status code (e.g., 200). Returns 0 if unset.
+         */
+        uint16_t getStatus() const;
+
+        /**
+         * @brief Get response body as string.
+         *
+         * @return const std::string& Body content (may be empty).
+         */
+        const std::string &getBody() const;
+
+        /**
          * @brief Initiates the coroutine to send the response.
          *
          * @return usub::uvent::task::AwaitableBase* Pointer to the awaitable coroutine.
@@ -907,6 +931,7 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                     auto &transfer_encoding_vec = headers["transfer-encoding"];
                     if (transfer_encoding_vec.back() == "chunked") {
                         this->state_ = RESPONSE_STATE::DATA_CHUNKED_SIZE;
+                        goto data_chunked_size;
                     } else {
                         this->state_ = RESPONSE_STATE::ERROR;
                         return c;// malformed: unsupported transfer encoding
@@ -933,6 +958,7 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                 break;
             }
             case RESPONSE_STATE::DATA_CHUNKED_SIZE:
+            data_chunked_size:
                 if (*c == '\r') {
                     carriage_return = true;
                 } else if (*c == '\n') {
@@ -956,12 +982,24 @@ std::string::const_iterator usub::server::protocols::http::Response::parse(// TO
                 break;
 
             case RESPONSE_STATE::DATA_CHUNKED:
-                this->body_.push_back(*c);
-                ++this->line_size_;
-                if (this->line_size_ == this->helper_.size_) {
-                    this->state_ = RESPONSE_STATE::DATA_CHUNKED_SIZE;
+                body_.push_back(*c);
+                ++line_size_;
+                if (line_size_ == helper_.size_) {
+                    state_ = RESPONSE_STATE::DATA_CHUNKED_CRLF;
                 }
                 break;
+            case RESPONSE_STATE::DATA_CHUNKED_CRLF:
+                if (*c == '\r') {
+                    carriage_return = true;
+                } else if (*c == '\n' && carriage_return) {
+                    carriage_return = false;
+                    state_ = RESPONSE_STATE::DATA_CHUNKED_SIZE;
+                } else {
+                    state_ = RESPONSE_STATE::ERROR;
+                    return c;
+                }
+                break;
+
 
             default:
                 return c;

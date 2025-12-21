@@ -174,17 +174,32 @@ install(EXPORT serverTargets
 
 option(BUILD_EXAMPLES "Build the Server example executables" OFF)
 
+if (USE_OPEN_SSL)
+    find_package(OpenSSL REQUIRED)
+    if (OpenSSL_FOUND)
+        message(STATUS "OpenSSL found, enabling TLS support in examples")
+        add_definitions(-DUSE_OPEN_SSL)
+        include_directories(${OPENSSL_INCLUDE_DIR})
+        link_libraries(${OPENSSL_LIBRARIES})
+    else()
+        message(WARNING "OpenSSL not found, TLS support will be disabled in examples")
+    endif()
+endif()
+
 if(BUILD_EXAMPLES)
     add_executable(SimpleServer examples/SimpleServer.cpp)
     add_executable(SimpleClient examples/SimpleClient.cpp)
+    
+    target_link_libraries(SimpleServer server ZLIB::ZLIB pthread usub::uvent)
+    target_link_libraries(SimpleClient server ZLIB::ZLIB pthread usub::uvent)
 
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_link_libraries(SimpleServer server ZLIB::ZLIB pthread usub::uvent) # spdlog::spdlog
-        target_link_libraries(SimpleClient server ZLIB::ZLIB pthread usub::uvent) # spdlog::spdlog
-    else()
-        target_link_libraries(SimpleServer server ZLIB::ZLIB pthread usub::uvent)
-        target_link_libraries(SimpleClient server ZLIB::ZLIB pthread usub::uvent)
+    if (USE_OPEN_SSL)
+        add_executable(AdvancedClient examples/AdvancedClientExamples.cpp)
+        add_executable(ModernHttpClient examples/ModernHttpClient.cpp)
+        target_link_libraries(AdvancedClient server ZLIB::ZLIB pthread usub::uvent OpenSSL::SSL OpenSSL::Crypto)
+        target_link_libraries(ModernHttpClient server ZLIB::ZLIB pthread usub::uvent OpenSSL::SSL OpenSSL::Crypto)
     endif()
+    
 endif()
 
 # ========================================
