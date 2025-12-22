@@ -39,15 +39,15 @@ namespace usub::server::protocols::http {
             spdlog::info("Entering readCallback");
 #endif
             std::optional<std::pair<Route *, bool>> match{};
-            //            std::string::const_iterator c{};
+            std::string::const_iterator c{};
 
-            auto parser = this->request_.parseHTTP1_X_yield(data);
-            bool ret{false};
+            // auto parser = this->request_.parseHTTP1_X_yield(data);
+            // bool ret{false};
         retry_parse:
-            // if (c == data.end()) co_return;
-            if (ret) co_return;
-            //           c = this->request_.parseHTTP1_X(data, c);
-            ret = co_await parser;
+            if (c == data.end()) co_return;
+            // if (ret) co_return;
+            c = this->request_.parseHTTP1_X(data, c);
+            // ret = co_await parser;
             // if (this->request_.getState() < STATE::HEADERS_PARSED) co_return;
 
             if (!this->matched_route_) {
