@@ -7,6 +7,8 @@
 #include <string>
 
 namespace usub::utils {
+    // TODO: This should be removed/copied into classes with corresponding character limitations instead of all things being in one place
+    // Also the naming of this file is not really good
 
     bool isTchar(char c);
     // checks if string contains only tchar characters and SP (space) or "," (comma)

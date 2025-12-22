@@ -23,6 +23,11 @@
 #include "Protocols/HTTP/Headers.h"
 #include "utils/HTTPUtils/HTTPUtils.h"
 #include "utils/utils.h"
+#include "uvent/tasks/Awaitable.h"
+
+#if defined(UNET_USE_UJSON) && UNET_USE_UJSON
+#include <ujson/ujson.h>
+#endif
 
 
 namespace usub::server::protocols::http {
@@ -40,9 +45,10 @@ namespace usub::server::protocols::http {
         HTTP_0_9 = 1,///< HTTP/0.9.
         HTTP_1_0 = 2,///< HTTP/1.0.
         HTTP_1_1 = 3,///< HTTP/1.1.
-        HTTP_2_0 = 4,///< HTTP/2.0.
-        HTTP_3_0 = 5,///< HTTP/3.0.
-        BROKEN = 6   ///< Indicates a broken or unsupported HTTP version.
+        HTTP_1_X = 4,///< HTTP/1.1.
+        HTTP_2_0 = 5,///< HTTP/2.0.
+        HTTP_3_0 = 6,///< HTTP/3.0.
+        BROKEN = 10  ///< Indicates a broken or unsupported HTTP version.
     };
 
     /**
@@ -109,7 +115,9 @@ namespace usub::server::protocols::http {
         DATA_CONTENT_LENGTH = 7,
         DATA_CHUNKED_SIZE = 8,
         DATA_CHUNKED = 9,
-
+        ERROR = 10,
+        FINISHED = 11,
+        DATA_CHUNKED_CRLF = 12,
         SENDING = 50,
         SENDING_CONTENT_LENGTH = 51,
         SENDING_CHUNKED = 52,
@@ -198,7 +206,6 @@ namespace usub::server::protocols::http {
          */
         usub::server::protocols::http::Headers &getHeaders() noexcept;
         const usub::server::protocols::http::Headers &getHeaders() const noexcept;
-
 
         /**
          * @brief Retrieves a reference to the message data as a vector of unsigned characters.
@@ -366,6 +373,16 @@ namespace usub::server::protocols::http {
         std::string &getRequestMethod();
         const std::string &getRequestMethod() const;
 
+        Request &setRequestMethod(const std::string &method) {
+            this->method_token_ = method;
+            return *this;
+        }
+
+        usub::server::protocols::http::Headers &addHeader(std::string_view key, std::string_view value) {
+            this->headers_.addHeader<usub::server::protocols::http::Request>(std::string(key), std::string(value));
+            return this->headers_;
+        }
+
         /**
          * @brief Retrieves the current state of the request parsing.
          *
@@ -383,6 +400,15 @@ namespace usub::server::protocols::http {
          * @param uri The URI string to set.
          */
         void setUri(const std::string &uri);
+
+        /**
+         * @brief Sets the request body and optional content type.
+         *
+         * @param data The body data to set.
+         * @param content_type Optional content type string.
+         * @return Request& Reference to this request.
+         */
+        Request &setBody(const std::string &data, const std::string &content_type = "");
 
         /**
          * @brief Sets the GET parameters of the request.
@@ -426,6 +452,21 @@ namespace usub::server::protocols::http {
          * @return std::string The data string.
          */
         std::string getBody();
+
+#if defined(UNET_USE_UJSON) && UNET_USE_UJSON
+        /**
+         * @brief Parse request body as JSON into type @p T using ujson.
+         *
+         * @tparam T Target type.
+         * @tparam Strict If true, unknown fields are treated as error (strict mode).
+         * @return ujson::Result<T> (expected-like): on success contains T, otherwise contains ujson::Error.
+         */
+        template<class T, bool Strict = false>
+        [[nodiscard]] auto getAsJson() const
+                -> decltype(ujson::try_parse<T, Strict>(std::declval<std::string_view>())) {
+            return ujson::try_parse<T, Strict>(std::string_view{this->body_});
+        }
+#endif
 
         /**
          * @brief Parses the query parameters from the URI.
@@ -490,6 +531,7 @@ namespace usub::server::protocols::http {
          *  
          */
         [[maybe_unused]] std::string::const_iterator parseHTTP1_X(const std::string &request, std::string::const_iterator start_pos = {});
+        usub::uvent::task::Awaitable<bool> parseHTTP1_X_yield(const std::string &request);
 
         /**
          * @brief Parses an HTTP/2.0 request.
@@ -527,6 +569,8 @@ namespace usub::server::protocols::http {
          */
         void clear();
 
+        std::string string();
+
         /**
          * @brief Compares this request with another for equality.
          *
@@ -563,6 +607,11 @@ namespace usub::server::protocols::http {
      */
     class Response : public Message {
     private:
+        // TODO: Temporary stuff
+        bool carriage_return{}, newline{};
+        size_t line_size_{};
+
+
         /**
          * @brief HTTP status code as a string. default: "500".
          */
@@ -635,6 +684,9 @@ namespace usub::server::protocols::http {
          */
         Response &setRoute(Route *route);
 
+
+        void setState(const RESPONSE_STATE &state);
+
         /**
          * @brief Adds a header to the response.
          *
@@ -651,6 +703,10 @@ namespace usub::server::protocols::http {
          * @return Response& Reference to this response object.
          */
         Response &setStatus(uint16_t status_code);
+
+        RESPONSE_STATE &getState() {
+            return this->state_;
+        }
 
         /**
          * @brief Sets the HTTP status code of the response using a string view.
@@ -710,6 +766,57 @@ namespace usub::server::protocols::http {
         void clear();
 
         /**
+         * @brief Get numeric status code for the response.
+         *
+         * @return uint16_t Numeric HTTP status code (e.g., 200). Returns 0 if unset.
+         */
+        uint16_t getStatus() const;
+
+        /**
+         * @brief Get response body as string.
+         *
+         * @return const std::string& Body content (may be empty).
+         */
+        const std::string &getBody() const;
+
+        /**
+         * @brief Get response body encoded as hexadecimal string.
+         *
+         * Each byte of the body is converted to two uppercase hexadecimal
+         * characters (00–FF). The resulting string contains no separators.
+         *
+         * @return std::string Hex-encoded body. Empty if body is empty.
+         */
+        [[nodiscard]] std::string getBodyHex() const;
+
+        /**
+         * @brief Get response body encoded as hexadecimal string with size limit.
+         *
+         * Encodes at most @p max_bytes bytes from the beginning of the body.
+         * Useful for logging or debugging large payloads.
+         *
+         * @param max_bytes Maximum number of bytes to encode from the body.
+         * @return std::string Hex-encoded body prefix. Empty if body is empty
+         *         or @p max_bytes is zero.
+         */
+        [[nodiscard]] std::string getBodyHex(size_t max_bytes) const;
+
+#if defined(UNET_USE_UJSON) && UNET_USE_UJSON
+        /**
+         * @brief Parse response body as JSON into type @p T using ujson.
+         *
+         * @tparam T Target type.
+         * @tparam Strict If true, unknown fields are treated as error (strict mode).
+         * @return ujson::Result<T> (expected-like): on success contains T, otherwise contains ujson::Error.
+         */
+        template<class T, bool Strict = false>
+        [[nodiscard]] auto getAsJson() const
+                -> decltype(ujson::try_parse<T, Strict>(std::declval<std::string_view>())) {
+            return ujson::try_parse<T, Strict>(std::string_view{this->body_});
+        }
+#endif
+
+        /**
          * @brief Initiates the coroutine to send the response.
          *
          * @return usub::uvent::task::AwaitableBase* Pointer to the awaitable coroutine.
@@ -722,8 +829,241 @@ namespace usub::server::protocols::http {
          * @return usub::uvent::task::Awaitable<void> Awaitable task representing the send operation.
          */
         usub::uvent::task::Awaitable<void> send();
+
+
+        template<VERSION version>
+        [[maybe_unused]] std::string::const_iterator parse(const std::string &data, std::string::const_iterator start_pos = {});
     };
 
 }// namespace usub::server::protocols::http
+
+template<usub::server::protocols::http::VERSION version>
+std::string::const_iterator usub::server::protocols::http::Response::parse(// TODO: Was Written by ChatGPT, without a second of thought put into this
+        const std::string &data, std::string::const_iterator start_pos) {
+
+    if constexpr (version != VERSION::HTTP_1_0 && version != VERSION::HTTP_1_1 && version != VERSION::HTTP_1_X) {
+        static_assert(version == VERSION::HTTP_1_0 || version == VERSION::HTTP_1_1 || version == VERSION::HTTP_1_X,
+                      "Unsupported HTTP version for response parser");
+        return {};
+    }
+
+    auto c = (start_pos == std::string::const_iterator()) ? data.begin() : start_pos;
+    RESPONSE_STATE &state = this->state_;
+    bool &carriage_return = this->carriage_return;
+
+    for (; c != data.end(); ++c, ++this->helper_.offset_) {
+        switch (state) {
+            case RESPONSE_STATE::VERSION:
+                if (*c == ' ') {
+                    if (this->data_value_pair_.first.empty()) {
+                        this->state_ = RESPONSE_STATE::ERROR;
+                        return c;// malformed: empty version
+                    }
+                    if (this->data_value_pair_.first == "HTTP/1.0") {
+                        this->http_version_ = VERSION::HTTP_1_0;
+                    } else if (this->data_value_pair_.first == "HTTP/1.1") {
+                        this->http_version_ = VERSION::HTTP_1_1;
+                    } else {
+                        this->http_version_ = VERSION::BROKEN;
+                        this->state_ = RESPONSE_STATE::ERROR;
+                        return c;
+                    }
+                    this->data_value_pair_.first.clear();
+                    state = RESPONSE_STATE::STATUS_CODE;
+                    continue;
+                } else if (*c == '\r' || *c == '\n') {
+                    this->state_ = RESPONSE_STATE::ERROR;
+                    return c;// malformed: premature CRLF
+                } else {
+                    this->data_value_pair_.first.push_back(*c);
+                }
+                break;
+
+            case RESPONSE_STATE::STATUS_CODE:
+                if (*c == ' ') {
+                    if (this->data_value_pair_.first.empty()) {
+                        this->state_ = RESPONSE_STATE::ERROR;
+                        return c;// malformed: empty status code
+                    }
+                    this->status_code_ = std::move(this->data_value_pair_.first);
+                    this->data_value_pair_.first.clear();
+                    state = RESPONSE_STATE::STATUS_MESSAGE;
+                    continue;
+                } else if (!std::isdigit(*c)) {
+                    this->state_ = RESPONSE_STATE::ERROR;
+                    return c;// malformed: status code must be numeric
+                } else {
+                    this->data_value_pair_.first.push_back(*c);
+                }
+                break;
+
+            case RESPONSE_STATE::STATUS_MESSAGE:
+                if (*c == '\r') {
+                    carriage_return = true;
+                } else if (*c == '\n') {
+                    if (!carriage_return) {
+                        this->state_ = RESPONSE_STATE::SENT;
+                        return c;// malformed: \n without \r
+                    }
+                    if (this->data_value_pair_.first.empty()) {
+                        this->state_ = RESPONSE_STATE::SENT;
+                        return c;// malformed: missing status message
+                    }
+                    this->status_message_ = std::move(this->data_value_pair_.first);
+                    this->data_value_pair_.first.clear();
+                    carriage_return = false;
+                    state = RESPONSE_STATE::HEADERS_KEY;
+                    break;
+                } else if (std::iscntrl(*c)) {
+                    this->state_ = RESPONSE_STATE::ERROR;
+                    return c;// malformed: control char in message
+                } else {
+                    carriage_return = false;
+                    this->data_value_pair_.first.push_back(*c);
+                }
+                break;
+            case RESPONSE_STATE::HEADERS_KEY:
+                if (*c == '\r') {
+                    carriage_return = true;
+                    break;
+                } else if (*c == '\n') {
+                    if (carriage_return) {
+                        carriage_return = false;
+                        state = RESPONSE_STATE::HEADERS_PARSED;
+                        break;
+                    } else {
+                        this->state_ = RESPONSE_STATE::ERROR;
+                        return c;// malformed: \n without \r
+                    }
+                } else if (*c == ':') {
+                    if (this->data_value_pair_.first.empty()) {
+                        this->state_ = RESPONSE_STATE::SENT;
+                        return c;// malformed: empty header key
+                    }
+                    state = RESPONSE_STATE::HEADERS_VALUE;
+                } else if (std::iscntrl(*c)) {
+                    this->state_ = RESPONSE_STATE::ERROR;
+                    return c;// malformed: control char in header key
+                } else {
+                    this->data_value_pair_.first.push_back(std::tolower(*c));
+                }
+                break;
+
+            case RESPONSE_STATE::HEADERS_VALUE:
+                if (*c == '\r') {
+                    carriage_return = true;
+                } else if (*c == '\n') {
+                    if (!carriage_return) {
+                        this->state_ = RESPONSE_STATE::ERROR;
+                        return c;// malformed: \n without \r
+                    }
+                    this->headers_.addHeader<usub::server::protocols::http::Response>(std::move(this->data_value_pair_.first), std::move(this->data_value_pair_.second));
+                    this->data_value_pair_.first.clear();
+                    this->data_value_pair_.second.clear();
+                    carriage_return = false;
+                    state = RESPONSE_STATE::HEADERS_KEY;
+                } else {
+                    carriage_return = false;
+                    this->data_value_pair_.second.push_back(*c);
+                }
+                break;
+            case RESPONSE_STATE::HEADERS_PARSED: {
+                this->line_size_ = 0;
+                auto &headers = this->headers_;
+                auto &content_length_vec = headers["content-length"];
+                auto content_length = content_length_vec.size() == 1 ? std::stoi(content_length_vec[0]) : 0;
+
+                int code = std::stoi(this->status_code_);
+                if (code == 204 || code == 304 || (code >= 100 && code < 200)) {
+                    this->state_ = RESPONSE_STATE::FINISHED;
+                    return c;// no body expected
+                }
+
+                if (content_length > 0) {
+                    this->helper_.size_ = content_length;
+                    this->state_ = RESPONSE_STATE::DATA_CONTENT_LENGTH;
+                    goto content_length;
+                } else if (headers.contains("transfer-encoding") && !headers.at("transfer-encoding").empty()) {
+                    auto &transfer_encoding_vec = headers["transfer-encoding"];
+                    if (transfer_encoding_vec.back() == "chunked") {
+                        this->state_ = RESPONSE_STATE::DATA_CHUNKED_SIZE;
+                        goto data_chunked_size;
+                    } else {
+                        this->state_ = RESPONSE_STATE::ERROR;
+                        return c;// malformed: unsupported transfer encoding
+                    }
+                } else {
+                    this->state_ = RESPONSE_STATE::FINISHED;
+                    return c;// malformed: no content-length or chunked
+                }
+                break;
+            }
+            case RESPONSE_STATE::DATA_CONTENT_LENGTH: {
+                content_length:
+                    if (this->line_size_ < this->helper_.size_) {
+                        this->body_.push_back(*c);
+                        ++this->line_size_;
+
+                        if (this->line_size_ == this->helper_.size_) {
+                            this->state_ = RESPONSE_STATE::FINISHED;
+                            return ++c;
+                        }
+                    } else {
+                        this->state_ = RESPONSE_STATE::ERROR;
+                        return c;
+                    }
+                break;
+            }
+            case RESPONSE_STATE::DATA_CHUNKED_SIZE:
+            data_chunked_size:
+                if (*c == '\r') {
+                    carriage_return = true;
+                } else if (*c == '\n') {
+                    if (!carriage_return) {
+                        this->state_ = RESPONSE_STATE::ERROR;
+                        return c;// malformed newline
+                    }
+                    this->helper_.size_ = std::stoul(this->data_value_pair_.first, nullptr, 16);
+                    this->data_value_pair_.first.clear();
+                    carriage_return = false;
+                    if (this->helper_.size_ == 0) {
+                        this->state_ = RESPONSE_STATE::FINISHED;
+                        return ++c;
+                    } else {
+                        this->line_size_ = 0;
+                        this->state_ = RESPONSE_STATE::DATA_CHUNKED;
+                    }
+                } else {
+                    this->data_value_pair_.first.push_back(*c);
+                }
+                break;
+
+            case RESPONSE_STATE::DATA_CHUNKED:
+                body_.push_back(*c);
+                ++line_size_;
+                if (line_size_ == helper_.size_) {
+                    state_ = RESPONSE_STATE::DATA_CHUNKED_CRLF;
+                }
+                break;
+            case RESPONSE_STATE::DATA_CHUNKED_CRLF:
+                if (*c == '\r') {
+                    carriage_return = true;
+                } else if (*c == '\n' && carriage_return) {
+                    carriage_return = false;
+                    state_ = RESPONSE_STATE::DATA_CHUNKED_SIZE;
+                } else {
+                    state_ = RESPONSE_STATE::ERROR;
+                    return c;
+                }
+                break;
+
+
+            default:
+                return c;
+        }
+    }
+
+    return c;
+}
 
 #endif// HTTP_MESSAGE_H

@@ -11,6 +11,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -fpic")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
+option(UNET_USE_UJSON "Enable ujson support (getAsJson<T>)" OFF)
 #set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer" CACHE STRING "Debug flags" FORCE)
 #set(CMAKE_C_FLAGS_DEBUG "-g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer" CACHE STRING "Debug flags" FORCE)
 #set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-fsanitize=address,undefined" CACHE STRING "Linker flags" FORCE)
@@ -26,11 +27,20 @@ include(FetchContent)
 FetchContent_Declare(
     uvent 
     GIT_REPOSITORY https://github.com/Usub-development/uvent.git
-    GIT_TAG v3.6.0
-    FIND_PACKAGE_ARGS
+    GIT_TAG main
 )
 
 FetchContent_MakeAvailable(uvent)
+
+if (UNET_USE_UJSON)
+    FetchContent_Declare(
+            ujson
+            GIT_REPOSITORY https://github.com/Usub-development/ujson.git
+            GIT_TAG main
+            FIND_PACKAGE_ARGS
+    )
+    FetchContent_MakeAvailable(ujson)
+endif()
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
@@ -75,7 +85,6 @@ add_library(server
     src/server/server.cpp
 
     # utils
-    src/utils/globals.cpp
     src/utils/utils.cpp
     src/utils/configuration/ConfigReader.cpp
     src/utils/crypto/SHA1.cpp
@@ -127,6 +136,16 @@ else()
     )
 endif ()
 
+target_compile_definitions(server PUBLIC
+        $<$<BOOL:${UNET_USE_UJSON}>:UNET_USE_UJSON>
+)
+
+if (UNET_USE_UJSON)
+    target_link_libraries(server PUBLIC
+            usub::ujson
+    )
+endif()
+
 # --------------------
 # INSTALL
 # -------------------
@@ -176,14 +195,32 @@ install(EXPORT serverTargets
 
 option(BUILD_EXAMPLES "Build the Server example executables" OFF)
 
-if(BUILD_EXAMPLES)
-    add_executable(BasicExample examples/SimpleServer.cpp)
-
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_link_libraries(BasicExample server ZLIB::ZLIB usub::uvent spdlog::spdlog)
+if (USE_OPEN_SSL)
+    find_package(OpenSSL REQUIRED)
+    if (OpenSSL_FOUND)
+        message(STATUS "OpenSSL found, enabling TLS support in examples")
+        add_definitions(-DUSE_OPEN_SSL)
+        include_directories(${OPENSSL_INCLUDE_DIR})
+        link_libraries(${OPENSSL_LIBRARIES})
     else()
-        target_link_libraries(BasicExample server ZLIB::ZLIB usub::uvent)
+        message(WARNING "OpenSSL not found, TLS support will be disabled in examples")
     endif()
+endif()
+
+if(BUILD_EXAMPLES)
+    add_executable(SimpleServer examples/SimpleServer.cpp)
+    add_executable(SimpleClient examples/SimpleClient.cpp)
+    
+    target_link_libraries(SimpleServer server ZLIB::ZLIB pthread usub::uvent)
+    target_link_libraries(SimpleClient server ZLIB::ZLIB pthread usub::uvent)
+
+    if (USE_OPEN_SSL)
+        add_executable(AdvancedClient examples/AdvancedClientExamples.cpp)
+        add_executable(ModernHttpClient examples/ModernHttpClient.cpp)
+        target_link_libraries(AdvancedClient server ZLIB::ZLIB pthread usub::uvent OpenSSL::SSL OpenSSL::Crypto)
+        target_link_libraries(ModernHttpClient server ZLIB::ZLIB pthread usub::uvent OpenSSL::SSL OpenSSL::Crypto)
+    endif()
+    
 endif()
 
 # ========================================

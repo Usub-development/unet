@@ -3,6 +3,9 @@
 #include <expected>
 
 namespace usub::server::utils::error {
+
+    // TODO: This will later be used all throughout the program to tell if there was an error during parsing.
+
     enum class ErrorSeverity {
         Warning,
         Critical

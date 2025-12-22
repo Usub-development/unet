@@ -45,7 +45,7 @@ namespace usub::server{
         }
 
         usub::uvent::task::Awaitable<void>
-        clientCoroutine(usub::uvent::net::SocketHolder socket)
+        clientCoroutine(usub::uvent::net::TCPClientSocket socket)
         {
             SSL* ssl = usub::utils::ssl::create_ssl(ctx_);
             if (!ssl) { 
