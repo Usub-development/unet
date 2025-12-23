@@ -1,8 +1,12 @@
 #pragma once
 
+#include <any>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
+#include <unordered_map>
+
 
 #include "unet/http/header.hpp"
 #include "unet/http/message.hpp"
@@ -23,6 +27,10 @@ namespace usub::unet::http {
         RequestMetadata metadata{};
         usub::unet::header::Headers headers{};
         std::string body{};
+
+        std::unordered_map<std::string, std::string> uri_params{};
+        std::any user_data{};
+
         MessagePolicy policy{};// keep it last for easier initialization
     };
 

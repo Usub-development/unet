@@ -26,106 +26,25 @@ include(FetchContent)
 FetchContent_Declare(
     uvent 
     GIT_REPOSITORY https://github.com/Usub-development/uvent.git
-    GIT_TAG v3.6.0
-    FIND_PACKAGE_ARGS
+    GIT_TAG main
+    # FIND_PACKAGE_ARGS
 )
 
 FetchContent_MakeAvailable(uvent)
 
-include_directories(
-    ${CMAKE_SOURCE_DIR}/include
+
+file(GLOB_RECURSE UNET_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/new-include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/new-include/*.hpp")
+file(GLOB_RECURSE UNET_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/new-src/*.cpp")
+
+# Build the new implementation as a separate library so it can be tested independently
+add_library(unet
+    ${UNET_SOURCES}
+    ${UNET_HEADERS}
 )
 
-file(GLOB_RECURSE MYLIBRARY_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
 
-add_library(server
-
-    # Components/Compression
-    src/Components/Compression/gzip.cpp
-
-    # Components/Encodings
-    src/Components/Encodings/PercentEncoded.cpp
-
-    # Components/Headers
-    src/Protocols/HTTP/Headers.cpp
-
-    # Components/URL
-    src/Components/URL/QueryParams.cpp
-    src/Components/URL/URL.cpp
-
-    #Components/DataTypes
-    src/Components/DataTypes/Multipart/MultipartFormData.cpp
-
-    # Protocols/HTTP
-    src/Protocols/HTTP/EndpointHandler.cpp
-    src/Protocols/HTTP/RouterCommon.cpp
-    src/Protocols/HTTP/RadixRouter.cpp
-    
-    src/Protocols/HTTP/headers_lookup.cpp
-    src/Protocols/HTTP/HTTP1.cpp
-    src/Protocols/HTTP/Message.cpp
-    src/Protocols/HTTP/Middlewares.cpp
-
-    # Protocols/websocket
-    # Protocols/websocket/Websocket.cpp
-    # Protocols/websocket/WebsocketBase.cpp
-
-    # server
-    # server/client_handler.cpp
-    src/server/server.cpp
-
-    # utils
-    src/utils/globals.cpp
-    src/utils/utils.cpp
-    src/utils/configuration/ConfigReader.cpp
-    src/utils/crypto/SHA1.cpp
-    # utils/ssl/data.cpp
-    src/utils/toml/toml.cpp
-    src/utils/HTTPUtils/HTTPUtils.cpp
-)
-add_library(usub::server ALIAS server)
-
-
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    message(STATUS "Debug mode enabled")
-    #    add_definitions(-DUVENT_DEBUG)
-    #
-    #    include(FetchContent)
-    #    FetchContent_Declare(
-    #            spdlog
-    #            GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    #            GIT_TAG v1.14.1
-    #            FIND_PACKAGE_ARGS
-    #    )
-    #    FetchContent_MakeAvailable(spdlog)
-endif ()
-
-
-#add_dependencies(${CURRENT_PROJECT_NAME} run_tests)
-FetchContent_Declare(
-    ZLIB
-    GIT_REPOSITORY https://github.com/madler/zlib.git
-    GIT_TAG v1.3.1.2
-    FIND_PACKAGE_ARGS
-)
-
-FetchContent_MakeAvailable(ZLIB)
-
-
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-
-    target_link_libraries(server PRIVATE
-            ZLIB::ZLIB
-            usub::uvent
-            #            spdlog::spdlog
-    )
-
-else()
-    target_link_libraries(server PUBLIC
-            ZLIB::ZLIB
-            usub::uvent
-    )
-endif ()
+# Link dependencies that the new implementation may need (reuse existing fetches)
+target_link_libraries(unet PUBLIC usub::uvent)
 
 # --------------------
 # INSTALL
@@ -134,21 +53,21 @@ endif ()
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
-target_include_directories(server 
+target_include_directories(unet 
 PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/new-include
 PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include/server>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/new-include>
+    $<INSTALL_INTERFACE:include/>
 )
 
 configure_package_config_file(
-    cmake/serverConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/serverConfig.cmake
-    INSTALL_DESTINATION lib/cmake/server
+    cmake/unetConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/unetConfig.cmake
+    INSTALL_DESTINATION lib/cmake/unet
 )
 
-install(TARGETS server
+install(TARGETS unet
     EXPORT serverTargets
     #LIBRARY DESTINATION lib
     #ARCHIVE DESTINATION lib
@@ -157,16 +76,16 @@ install(TARGETS server
     INCLUDES DESTINATION include/server
 )
 
-foreach(header ${MYLIBRARY_HEADERS})
+foreach(header ${UNET_HEADERS})
     get_filename_component(header_path ${header} DIRECTORY)
-    file(RELATIVE_PATH header_relative_path "${CMAKE_CURRENT_SOURCE_DIR}/include" ${header_path})
-    install(FILES ${header} DESTINATION include/server/${header_relative_path})
+    file(RELATIVE_PATH header_relative_path "${CMAKE_CURRENT_SOURCE_DIR}/new-include" ${header_path})
+    install(FILES ${header} DESTINATION include/${header_relative_path})
 endforeach()
 
 install(EXPORT serverTargets
-    FILE serverConfig.cmake
+    FILE unetConfig.cmake
     NAMESPACE usub::
-    DESTINATION lib/cmake/server
+    DESTINATION lib/cmake/unet
 )
 
 
@@ -177,36 +96,6 @@ install(EXPORT serverTargets
 option(BUILD_EXAMPLES "Build the Server example executables" OFF)
 
 if(BUILD_EXAMPLES)
-    add_executable(BasicExample examples/SimpleServer.cpp)
-
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_link_libraries(BasicExample server ZLIB::ZLIB usub::uvent spdlog::spdlog)
-    else()
-        target_link_libraries(BasicExample server ZLIB::ZLIB usub::uvent)
-    endif()
+    # TODO: Add example directories here
+    # add_subdirectory(examples)
 endif()
-
-# =========================================================
-# ======= BUILDING NEW IMPLEMENTATION & TESTS =============
-# =========================================================
-
-option(BUILD_NEW_IMPL "Build the new form-data implementation and tests" OFF)
-
-if(BUILD_NEW_IMPL)
-    # Build the new implementation as a separate library so it can be tested independently
-    add_library(unet_form_data STATIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/new-src/mime/form_data/generic.cpp
-    )
-
-    target_include_directories(unet_form_data PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/new-include
-    )
-
-    # Link dependencies that the new implementation may need (reuse existing fetches)
-    target_link_libraries(unet_form_data PUBLIC usub::uvent)
-
-    # Add test directory that exercises the new implementation
-    add_subdirectory(new-test)
-endif()
-
-# ========================================

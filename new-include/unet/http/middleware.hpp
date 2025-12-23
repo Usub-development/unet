@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+
 #include <uvent/Uvent.h>
 #include <vector>
 
@@ -17,7 +18,7 @@ namespace usub::unet::http {
      * Middleware functions can be executed during specific phases of handling an HTTP request and response.
      */
     enum class MiddlewarePhase {
-        SETTINGS,///< Middleware executed when the uri or pseudo headers become known, to set up handler specific limits
+        METADATA,///< Middleware executed when the uri or pseudo headers become known, to set up handler specific limits
         HEADER,  ///< Middleware executed after the headers were parsed.
         BODY,    ///< Middleware executed during the body processing phase in certain data types.
         RESPONSE ///< Middleware executed during sending response, called only once per response.
@@ -36,9 +37,25 @@ namespace usub::unet::http {
      * @return false If middleware processing should halt.
      * 
      * @note if false is returned, the middleware processing will halt and the response will not be sent automatically.
-     * @warning if Response is sent manually, the middleware processing will halt.
      */
     using MiddlewareFunctionType = usub::uvent::task::Awaitable<bool>(Request &, Response &);
+
+
+    using StatusHandlerFunctionType = usub::uvent::task::Awaitable<void>(Request &, Response &);
+
+    /**
+     * @typedef GenericErrorFunctionType
+     * @brief Defines the signature for generic error handling functions.
+     * 
+     * These functions are invoked when an error occurs during HTTP on a network operation. or other unexpected situations.
+     * They receive the original `Request`, the current `Response`, and an `UnetError` object detailing the error.
+     * @param request The HTTP request object.
+     * @param response The HTTP response object.
+     * @param error The `UnetError` object containing error details.
+     * 
+     * @note Intended for logging mostly.
+     */
+    using GenericErrorFunctionType = usub::uvent::task::Awaitable<void>(const Request &, const Response &, const usub::unet::utils::UnetError &);
 
     /**
      * @class MiddlewareChain
@@ -94,13 +111,6 @@ namespace usub::unet::http {
          *
          * @see MiddlewarePhase
          * @see MiddlewareFunctionType
-         */
-        MiddlewareChain &addMiddleware(MiddlewarePhase phase, std::function<MiddlewareFunctionType> middleware);
-
-        /**
-         * @brief syntactic sugar for addMiddleware
-         *
-         * @see addMiddleware()
          */
         MiddlewareChain &emplace_back(MiddlewarePhase phase, std::function<MiddlewareFunctionType> middleware);
 

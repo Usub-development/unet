@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "unet/http/router/route.hpp"
+#include "unet/utils/error.hpp"
 
 namespace usub::unet::http::router {
 
@@ -56,23 +57,19 @@ namespace usub::unet::http::router {
                           std::function<FunctionType> function,
                           std::unordered_map<std::string_view, const param_constraint *> &&constraints = {});
 
-        std::optional<std::pair<Route *, bool>> match(Request &request, std::string *error_description = nullptr);
+        std::expected<Route *, STATUS_CODE> match(usub::unet::http::Request &request, std::string *error_description = nullptr);
 
         MiddlewareChain &addMiddleware(MiddlewarePhase phase, std::function<MiddlewareFunctionType> middleware);
 
         MiddlewareChain &getMiddlewareChain();
-
-        void addErrorHandler(const std::string &error_code, std::function<FunctionType> function);
-
-        void executeErrorChain(Request &request, Response &response);
 
         std::string dump() const;
 
     private:
         std::unique_ptr<RadixNode> root_;
         std::vector<Route> routes_;
-        std::unordered_map<std::string, std::function<FunctionType>> error_page_handlers_;
-        MiddlewareChain middleware_chain_;
+        // std::unordered_map<std::string, std::function<FunctionType>> error_page_handlers_;
+        MiddlewareChain middleware_chain_;// global middlewares for every route
 
         struct Segment {
             enum Kind {
@@ -104,13 +101,13 @@ namespace usub::unet::http::router {
         bool matchDFS(RadixNode *node,
                       const std::vector<std::string> &segs,
                       std::size_t idx,
-                      Request &req,
+                      usub::unet::http::Request &request,
                       Route *&out,
                       std::string *last_error);
 
         bool matchIter(RadixNode *node,
                        const std::vector<std::string> &segs,
-                       Request &req,
+                       usub::unet::http::Request &request,
                        Route *&out,
                        std::string *last_error = nullptr);
 
