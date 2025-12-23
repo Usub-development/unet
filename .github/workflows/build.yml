@@ -24,23 +24,38 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-13 g++-13 ninja-build
+          sudo apt-get install -y build-essential gcc-13 g++-13
 
-      - name: Configure CMake (Linux)
+      - name: Configure CMake (Linux, Makefiles)
         if: runner.os == 'Linux'
         run: |
           cmake -S . -B build \
-            -G Ninja \
+            -G "Unix Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=gcc-13 \
-            -DCMAKE_CXX_COMPILER=g++-13
+            -DCMAKE_CXX_COMPILER=g++-13 \
+            -DCMAKE_CXX_STANDARD=23 \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON
 
-      - name: Configure CMake (macOS/Windows)
-        if: runner.os != 'Linux'
+      - name: Configure CMake (macOS, Makefiles)
+        if: runner.os == 'macOS'
         run: |
           cmake -S . -B build \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release
+            -G "Unix Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=23 \
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON
 
-      - name: Build
+      - name: Configure CMake (Windows, MSVC)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_STANDARD_REQUIRED=ON
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake --build build --config Release
+
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
         run: cmake --build build --parallel
