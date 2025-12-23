@@ -37,6 +37,12 @@ jobs:
             -DCMAKE_CXX_STANDARD=23 \
             -DCMAKE_CXX_STANDARD_REQUIRED=ON
 
+      - name: Toolchain info (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          clang++ --version
+          xcodebuild -version
+
       - name: Configure CMake (macOS, Makefiles)
         if: runner.os == 'macOS'
         run: |
