@@ -17,7 +17,7 @@ namespace usub::unet::http {
      *
      * Middleware functions can be executed during specific phases of handling an HTTP request and response.
      */
-    enum class MiddlewarePhase {
+    enum class MIDDLEWARE_PHASE {
         METADATA,///< Middleware executed when the uri or pseudo headers become known, to set up handler specific limits
         HEADER,  ///< Middleware executed after the headers were parsed.
         BODY,    ///< Middleware executed during the body processing phase in certain data types.
@@ -112,7 +112,7 @@ namespace usub::unet::http {
          * @see MiddlewarePhase
          * @see MiddlewareFunctionType
          */
-        MiddlewareChain &emplace_back(MiddlewarePhase phase, std::function<MiddlewareFunctionType> middleware);
+        MiddlewareChain &emplace_back(MIDDLEWARE_PHASE phase, std::function<MiddlewareFunctionType> middleware);
 
         /**
          * @brief Executes all middleware functions associated with a specific phase.
@@ -130,7 +130,7 @@ namespace usub::unet::http {
          * @see MiddlewarePhase
          * @see MiddlewareFunctionType
          */
-        bool execute(MiddlewarePhase phase, Request &request, Response &response) const;
+        bool execute(MIDDLEWARE_PHASE phase, Request &request, Response &response) const;
     };
 
 

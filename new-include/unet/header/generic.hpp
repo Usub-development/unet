@@ -49,19 +49,13 @@ namespace usub::unet::header {
             return header_keys_.contains(key_lower);
         }
 
-        template<class Type, ENUM Header>
-        std::expected<void, usub::unet::utils::UnetError> validate(std::string_view key, std::string_view value);
+        // template<class Type, ENUM Header>
+        // std::expected<void, usub::unet::utils::UnetError> validate(std::string_view key, std::string_view value);
 
     private:
         std::vector<Header> header_list_;
         std::set<std::string> header_keys_;// We can use this to quickly check for existence of headers for cases
                                            // where we don't allow duplicate headers. "Host", "Content-Length", etc.
     };
-
-    template<ENUM Header>
-    std::expected<void, usub::unet::utils::UnetError> Headers::validate<Generic, Header>(std::string_view key, std::string_view value) {
-        // Generic headers have no specific validation rules
-        return std::expected<void, usub::unet::utils::UnetError>(std::in_place);
-    }
 
 }// namespace usub::unet::header

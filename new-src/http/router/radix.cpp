@@ -174,7 +174,7 @@ namespace usub::unet::http::router {
 
         applyConstraints(segs, constraints);
         auto routePtr = std::make_unique<Route>(
-                methods, std::regex{}, param_names, std::move(handler),
+                methods, param_names, std::move(handler),
                 methods.contains("*"));
 
         Route *rawPtr = routePtr.get();
@@ -246,9 +246,9 @@ namespace usub::unet::http::router {
         return std::unexpected(STATUS_CODE::METHOD_NOT_ALLOWED);
     }
 
-    MiddlewareChain &Radix::addMiddleware(MiddlewarePhase phase,
+    MiddlewareChain &Radix::addMiddleware(MIDDLEWARE_PHASE phase,
                                           std::function<MiddlewareFunctionType> middleware) {
-        if (phase == MiddlewarePhase::HEADER) {
+        if (phase == MIDDLEWARE_PHASE::HEADER) {
             this->middleware_chain_.emplace_back(phase, std::move(middleware));
         } else {
             std::cerr << "Non header global middlewares are not supported yet" << std::endl;

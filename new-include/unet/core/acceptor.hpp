@@ -44,6 +44,6 @@ namespace usub::unet::core {
             std::shared_ptr<Uvent>
                     uvent_;
         }
-    }
+    };
 
 }// namespace usub::unet::core

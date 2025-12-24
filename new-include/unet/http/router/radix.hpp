@@ -12,6 +12,13 @@
 
 namespace usub::unet::http::router {
 
+    struct RadixNode;
+
+    struct param_constraint {
+        std::string pattern;
+        std::string description;
+    };
+
     struct ParamEdge {
         std::string name;               // имя параметра (id:)
         std::optional<std::regex> regex;// пусто -> [^/]+
@@ -19,10 +26,6 @@ namespace usub::unet::http::router {
         std::optional<param_constraint> constraint;
     };
 
-    struct param_constraint {
-        std::string pattern;
-        std::string description;
-    };
     const param_constraint default_constraint{
             R"([^/]+)",
             "Encountered an error..."};
@@ -59,7 +62,7 @@ namespace usub::unet::http::router {
 
         std::expected<Route *, STATUS_CODE> match(usub::unet::http::Request &request, std::string *error_description = nullptr);
 
-        MiddlewareChain &addMiddleware(MiddlewarePhase phase, std::function<MiddlewareFunctionType> middleware);
+        MiddlewareChain &addMiddleware(MIDDLEWARE_PHASE phase, std::function<MiddlewareFunctionType> middleware);
 
         MiddlewareChain &getMiddlewareChain();
 

@@ -13,7 +13,7 @@ namespace usub::unet::http::router {
         this->allowed_method_tokenns = std::move(methods);
     }
 
-    Route &Route::addMiddleware(MiddlewarePhase phase, std::function<MiddlewareFunctionType> middleware) {
+    Route &Route::addMiddleware(MIDDLEWARE_PHASE phase, std::function<MiddlewareFunctionType> middleware) {
         this->middleware_chain.emplace_back(phase, std::move(middleware));
         return *this;
     }

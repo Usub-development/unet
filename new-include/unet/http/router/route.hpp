@@ -99,6 +99,6 @@ namespace usub::unet::http::router {
          * @see MiddlewarePhase
          * @see MiddlewareFunctionType
          */
-        Route &addMiddleware(MiddlewarePhase phase, std::function<MiddlewareFunctionType> middleware);
+        Route &addMiddleware(MIDDLEWARE_PHASE phase, std::function<MiddlewareFunctionType> middleware);
     };
 }// namespace usub::unet::http::router
