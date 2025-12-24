@@ -26,7 +26,7 @@ namespace usub::unet::http {
             if (!result) {
                 goto send_body;
             }
-            switch (this->request_reader_.getContext().state_) {
+            switch (this->request_reader_.getContext().state) {
                 case HTTP1RequestParser::STATE::METADATA_DONE:
                     auto match = router_->match(this->request_);
                     if (!match) {
@@ -64,7 +64,7 @@ namespace usub::unet::http {
                 case HTTP1RequestParser::STATE::FAILED:
                     // Handle parse error
                     break;
-                case default:
+                default:
                     goto end;
                     break;
             }
