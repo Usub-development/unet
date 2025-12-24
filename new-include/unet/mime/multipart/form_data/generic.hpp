@@ -11,7 +11,7 @@
 // #include "utils/string_utils.h"
 
 // TODO: Remove forward declaration
-
+#include <algorithm>
 namespace usub::utils {
     struct CaseInsensitiveHash {
         std::size_t operator()(const std::string &key) const {

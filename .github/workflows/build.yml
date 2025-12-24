@@ -26,6 +26,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential gcc-13 g++-13
 
+      - name: Install toolchain (Windows)
+        if: runner.os == 'macOS'
+        run: |
+
+      - name: Install toolchain (Windows)
+        if: runner.os == 'Windows'
+        run: |
+
       - name: Configure CMake (Linux, Makefiles)
         if: runner.os == 'Linux'
         run: |
