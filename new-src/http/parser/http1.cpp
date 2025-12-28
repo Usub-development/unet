@@ -521,7 +521,7 @@ namespace usub::unet::http::parser::http1 {
                     if (already >= content_length) break;
 
                     // TODO: memcpy?
-                    request.body.append(reinterpret_cast<const char *>(begin), take);
+                    request.body.append(static_cast<char>(*begin), take);
 
                     begin += take;
                     ctx.current_state_size += take;
@@ -582,7 +582,7 @@ namespace usub::unet::http::parser::http1 {
                     const std::size_t available = static_cast<std::size_t>(end - begin);
                     const std::size_t take = (available < remaining) ? available : remaining;
 
-                    request.body.append(reinterpret_cast<const char *>(begin), take);
+                    request.body.append(static_cast<char>(*begin), take);
 
                     begin += take;
                     ctx.current_state_size += take;
