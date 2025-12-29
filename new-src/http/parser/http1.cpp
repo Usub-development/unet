@@ -1,10 +1,5 @@
 #include "unet/http/parser/http1.hpp"
 
-#include <array>
-#include <cstring>
-#include <limits>
-#include <utility>
-
 // TODO: Recheck on all that uses ctx....
 
 namespace usub::unet::http::parser::http1 {
@@ -406,7 +401,6 @@ namespace usub::unet::http::parser::http1 {
                     } else {
                         request.metadata.version = VERSION::HTTP_0_9;
                     }
-                    ++begin;
                     state = STATE::METADATA_DONE;
                     return {};
                 }
@@ -475,6 +469,8 @@ namespace usub::unet::http::parser::http1 {
                     [[fallthrough]];
                 }
                 case STATE::HEADER_LF: {
+                    auto &[key, value] = ctx.kv_buffer;
+                    request.headers.addHeader(std::move(key), std::move(value));
                     if (begin == end) {
                         return {};
                     }
@@ -505,9 +501,145 @@ namespace usub::unet::http::parser::http1 {
                     [[fallthrough]];
                 }
                 case STATE::HEADERS_DONE: {
-                    if (request.metadata.method_token == "GET" || request.metadata.method_token == "OPTIONS") {
-                        state = STATE::COMPLETE;
+                    ctx.current_state_size = 0;
+
+                    const bool method_no_body =
+                            request.metadata.method_token == "GET" ||
+                            request.metadata.method_token == "HEAD" ||
+                            request.metadata.method_token == "OPTIONS" ||
+                            request.metadata.method_token == "TRACE";
+
+                    const auto content_length_headers = request.headers.all("content-length");
+                    const auto transfer_encoding_headers = request.headers.all("transfer-encoding");
+                    const bool has_transfer_encoding = !transfer_encoding_headers.empty();
+
+                    std::size_t content_length_value = 0;
+                    bool content_length_seen = false;
+
+                    auto trim_view = [](std::string_view value) -> std::string_view {
+                        std::size_t start = 0;
+                        std::size_t end = value.size();
+                        while (start < end && (value[start] == ' ' || value[start] == '\t')) {
+                            ++start;
+                        }
+                        while (end > start && (value[end - 1] == ' ' || value[end - 1] == '\t')) {
+                            --end;
+                        }
+                        return std::string_view(value.data() + start, end - start);
+                    };
+
+                    auto parse_uint = [](std::string_view value, std::size_t &out) -> bool {
+                        if (value.empty()) return false;
+                        std::size_t result = 0;
+                        for (char c: value) {
+                            if (c < '0' || c > '9') {
+                                return false;
+                            }
+                            std::size_t digit = static_cast<std::size_t>(c - '0');
+                            if (result > (std::numeric_limits<std::size_t>::max() - digit) / 10) {
+                                return false;
+                            }
+                            result = result * 10 + digit;
+                        }
+                        out = result;
+                        return true;
+                    };
+
+                    for (const auto &header: content_length_headers) {
+                        std::string_view value = header.value;
+                        while (!value.empty()) {
+                            const std::size_t comma = value.find(',');
+                            std::string_view token = (comma == std::string_view::npos) ? value : value.substr(0, comma);
+                            token = trim_view(token);
+                            std::size_t parsed = 0;
+                            if (!parse_uint(token, parsed)) {
+                                return fail(Status::BAD_REQUEST, "Invalid Content-Length");
+                            }
+                            if (!content_length_seen) {
+                                content_length_value = parsed;
+                                content_length_seen = true;
+                            } else if (parsed != content_length_value) {
+                                return fail(Status::BAD_REQUEST, "Conflicting Content-Length");
+                            }
+                            if (comma == std::string_view::npos) break;
+                            value.remove_prefix(comma + 1);
+                        }
                     }
+
+                    bool has_chunked = false;
+                    bool has_other_encoding = false;
+                    auto is_chunked_token = [](std::string_view token) -> bool {
+                        constexpr std::string_view chunked = "chunked";
+                        if (token.size() != chunked.size()) return false;
+                        for (std::size_t i = 0; i < chunked.size(); ++i) {
+                            if (ascii_lower(token[i]) != chunked[i]) return false;
+                        }
+                        return true;
+                    };
+
+                    for (const auto &header: transfer_encoding_headers) {
+                        std::string_view value = header.value;
+                        while (!value.empty()) {
+                            const std::size_t comma = value.find(',');
+                            std::string_view token = (comma == std::string_view::npos) ? value : value.substr(0, comma);
+                            token = trim_view(token);
+                            if (token.empty()) {
+                                return fail(Status::BAD_REQUEST, "Invalid Transfer-Encoding");
+                            }
+                            if (is_chunked_token(token)) {
+                                has_chunked = true;
+                            } else {
+                                has_other_encoding = true;
+                            }
+                            if (comma == std::string_view::npos) break;
+                            value.remove_prefix(comma + 1);
+                        }
+                    }
+
+                    if (has_transfer_encoding) {
+                        if (request.metadata.version != VERSION::HTTP_1_1) {
+                            return fail(Status::BAD_REQUEST, "Transfer-Encoding not allowed");
+                        }
+                        if (!has_chunked || has_other_encoding) {
+                            return fail(Status::BAD_REQUEST, "Unsupported Transfer-Encoding");
+                        }
+                    }
+
+                    if (has_chunked && content_length_seen) {
+                        return fail(Status::BAD_REQUEST, "Both Transfer-Encoding and Content-Length");
+                    }
+
+                    if (method_no_body) {
+                        if (has_chunked) {
+                            return fail(Status::BAD_REQUEST, "Body not allowed for method");
+                        }
+                        if (content_length_seen && content_length_value != 0) {
+                            return fail(Status::BAD_REQUEST, "Body not allowed for method");
+                        }
+                        state = STATE::COMPLETE;
+                        break;
+                    }
+
+                    if (has_chunked) {
+                        ctx.current_state_size = 0;
+                        state = STATE::DATA_CHUNKED_SIZE;
+                        break;
+                    }
+
+                    if (content_length_seen) {
+                        if (content_length_value > request.policy.max_body_size) {
+                            return fail(Status::PAYLOAD_TOO_LARGE, "Body size too big");
+                        }
+                        ctx.body_read_size = content_length_value;
+                        if (content_length_value == 0) {
+                            state = STATE::COMPLETE;
+                        } else {
+                            state = STATE::DATA_CONTENT_LENGTH;
+                        }
+                        break;
+                    }
+
+                    state = STATE::COMPLETE;
                     break;
                 }
                 case STATE::DATA_CONTENT_LENGTH: {
@@ -521,7 +653,7 @@ namespace usub::unet::http::parser::http1 {
                     if (already >= content_length) break;
 
                     // TODO: memcpy?
-                    request.body.append(static_cast<char>(*begin), take);
+                    request.body.append(static_cast<const char *>(begin), take);
 
                     begin += take;
                     ctx.current_state_size += take;

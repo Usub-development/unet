@@ -1,10 +1,14 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <cstring>
 #include <expected>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "unet/http/parser/error.hpp"
 #include "unet/http/request.hpp"
@@ -72,6 +76,7 @@ namespace usub::unet::http::parser::http1 {
         RequestParser() = default;
         ~RequestParser() = default;
 
+        // Tries to parse full request
         static std::expected<Request, Error> parse(const std::string_view raw_request);
 
         std::expected<void, Error> parse(Request &request, std::string_view::const_iterator &begin, const std::string_view::const_iterator end);

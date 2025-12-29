@@ -22,6 +22,9 @@ namespace usub::unet::http {
             const std::string_view::const_iterator end = data.end();
 
         continue_parse:
+            if (begin == end) {
+                co_return;
+            }
             auto result = this->request_reader_.parse(request_, begin, end);
             if (!result) {
                 goto send_body;
