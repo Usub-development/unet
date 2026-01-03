@@ -17,7 +17,8 @@ namespace usub::unet::core {
     template<class StreamHandler>
     class Acceptor {
     public:
-        Acceptor(std::shared_ptr<Uvent> uvent /*Other params*/);
+        Acceptor(std::shared_ptr<Uvent> uvent /*Other params*/) : uvent_(uvent) {}
+
 
         template<typename Dispatcher>
             requires StreamHandlerFor<StreamHandler, Dispatcher>
@@ -25,8 +26,8 @@ namespace usub::unet::core {
             // TODO: propper init
             usub::uvent::net::TCPServerSocket server_socket{
                     "0.0.0.0",
-                    8080,
-                    50,
+                    22813,
+                    50,// backlog
                     usub::uvent::utils::net::IPV::IPV4,
                     usub::uvent::utils::net::TCP};
 
@@ -38,12 +39,12 @@ namespace usub::unet::core {
                     usub::uvent::system::co_spawn(StreamHandler::readLoop(std::move(soc.value()), std::move(dispatcher)));
                 }
             }
-
-
-        private:
-            std::shared_ptr<Uvent>
-                    uvent_;
         }
+
+
+    private:
+        std::shared_ptr<Uvent>
+                uvent_;
     };
 
 }// namespace usub::unet::core

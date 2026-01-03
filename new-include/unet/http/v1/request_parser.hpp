@@ -10,10 +10,11 @@
 #include <string_view>
 #include <utility>
 
-#include "unet/http/parser/error.hpp"
+#include "unet/http/error.hpp"
 #include "unet/http/request.hpp"
 
-namespace usub::unet::http::parser::http1 {
+namespace usub::unet::http::v1 {
+
     class RequestParser {
     public:
         enum class STATE {
@@ -77,13 +78,13 @@ namespace usub::unet::http::parser::http1 {
         ~RequestParser() = default;
 
         // Tries to parse full request
-        static std::expected<Request, Error> parse(const std::string_view raw_request);
+        static std::expected<Request, ParseError> parse(const std::string_view raw_request);
 
-        std::expected<void, Error> parse(Request &request, std::string_view::const_iterator &begin, const std::string_view::const_iterator end);
+        std::expected<void, ParseError> parse(Request &request, std::string_view::const_iterator &begin, const std::string_view::const_iterator end);
 
         ParserContext &getContext();
 
     private:
         ParserContext context_;
     };
-}// namespace usub::unet::http::parser::http1
+}// namespace usub::unet::http::v1

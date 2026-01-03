@@ -5,13 +5,13 @@
 #include <string>
 #include <string_view>
 
-#include "unet/http/parser/http1.hpp"
+#include "unet/http/v1/request_parser.hpp"
 
+using usub::unet::http::ParseError;
 using usub::unet::http::STATUS_CODE;
 using usub::unet::http::VERSION;
-using usub::unet::http::parser::Error;
-using usub::unet::http::parser::http1::RequestParser;
-using State = usub::unet::http::parser::http1::RequestParser::STATE;
+using usub::unet::http::v1::RequestParser;
+using State = usub::unet::http::v1::RequestParser::STATE;
 using usub::unet::http::Request;
 
 namespace {
@@ -20,7 +20,7 @@ namespace {
         explicit ParseHarness(std::string input)
             : data(std::move(input)), view(data), begin(view.begin()) {}
 
-        std::expected<void, Error> parse_to(std::size_t end_index) {
+        std::expected<void, ParseError> parse_to(std::size_t end_index) {
             assert(end_index <= view.size());
             auto end = view.begin() + static_cast<std::ptrdiff_t>(end_index);
             return parser.parse(request, begin, end);

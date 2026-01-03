@@ -5,8 +5,9 @@
 
 #include "unet/http/message.hpp"
 
-namespace usub::unet::http::parser {
-    struct Error {
+namespace usub::unet::http {
+
+    struct ParseError {
         enum class CODE {
             GENERIC_ERROR
         };
@@ -16,4 +17,4 @@ namespace usub::unet::http::parser {
         std::string message;
         std::array<char, 256> tail;
     };
-}// namespace usub::unet::http::parser
+}// namespace usub::unet::http

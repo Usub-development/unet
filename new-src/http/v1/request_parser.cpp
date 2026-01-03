@@ -1,8 +1,8 @@
-#include "unet/http/parser/http1.hpp"
+#include "unet/http/v1/request_parser.hpp"
 
 // TODO: Recheck on all that uses ctx....
 
-namespace usub::unet::http::parser::http1 {
+namespace usub::unet::http::v1 {
     namespace {
         constexpr std::array<std::uint8_t, 256> build_tchar_table() {
             std::array<std::uint8_t, 256> table{};
@@ -191,7 +191,7 @@ namespace usub::unet::http::parser::http1 {
 
     }// namespace
 
-    std::expected<Request, Error> RequestParser::parse(const std::string_view raw_request) {
+    std::expected<Request, ParseError> RequestParser::parse(const std::string_view raw_request) {
         RequestParser parser;
         Request request;
         auto begin = raw_request.begin();
@@ -205,21 +205,21 @@ namespace usub::unet::http::parser::http1 {
                 return request;
             }
             if (begin == end) {
-                Error err{Error::CODE::GENERIC_ERROR, STATUS_CODE::BAD_REQUEST, "Incomplete request", {}};
+                ParseError err{ParseError::CODE::GENERIC_ERROR, STATUS_CODE::BAD_REQUEST, "Incomplete request", {}};
                 return std::unexpected(err);
             }
         }
     }
 
-    std::expected<void, Error> RequestParser::parse(Request &request, std::string_view::const_iterator &begin, const std::string_view::const_iterator end) {
+    std::expected<void, ParseError> RequestParser::parse(Request &request, std::string_view::const_iterator &begin, const std::string_view::const_iterator end) {
         auto &ctx = this->context_;
         auto &state = ctx.state;
         using Status = usub::unet::http::STATUS_CODE;
 
         // TODO future reimplementation
-        auto fail = [&](Status status, std::string_view message) -> std::expected<void, Error> {
-            Error err{};
-            err.code = Error::CODE::GENERIC_ERROR;
+        auto fail = [&](Status status, std::string_view message) -> std::expected<void, ParseError> {
+            ParseError err{};
+            err.code = ParseError::CODE::GENERIC_ERROR;
             err.expected_status = status;
             err.message = std::string(message);
             //TODO: Rethink
@@ -797,4 +797,4 @@ namespace usub::unet::http::parser::http1 {
     RequestParser::ParserContext &RequestParser::getContext() {
         return this->context_;
     }
-}// namespace usub::unet::http::parser::http1
+}// namespace usub::unet::http::v1

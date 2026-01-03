@@ -3,34 +3,46 @@
 #include <memory>
 #include <string_view>
 
-#include "unet/http/parser/http1.hpp"
 #include "unet/http/request.hpp"
 #include "unet/http/response.hpp"
+#include "unet/http/router/route.hpp"
+#include "unet/http/session.hpp"
+#include "unet/http/v1/request_parser.hpp"
 
 namespace usub::unet::http {
-    using HTTP1RequestParser = usub::unet::http::parser::http1::RequestParser;
 
-    //Eveything is HTTP1 for now
-    template<enum VERSION, typename RouterType>
-    class HTTP {
+    template<typename RouterType>
+    class ServerSession<VERSION::HTTP_1_1, RouterType> {
     public:
-        HTTP() = default;
-        ~HTTP() = default;
+        ServerSession() = default;
+        ~ServerSession() = default;
 
         usub::uvent::task::Awaitable<void> on_read(std::string_view data, usub::uvent::net::TCPClientSocket &socket) {
             std::string_view::const_iterator begin = data.begin();
             const std::string_view::const_iterator end = data.end();
+            auto &state = this->request_reader_.getContext().state;
 
         continue_parse:
             if (begin == end) {
                 co_return;
             }
-            auto result = this->request_reader_.parse(request_, begin, end);
+            auto result = this->request_reader_.parse(this->request_, begin, end);
+
+            if (!this->current_route_ && state == v1::RequestParser::STATE::METADATA_DONE) {
+                auto match = this->router_->match(this->request_);
+                if (!match) {
+                    state = v1::RequestParser::STATE::FAILED;
+                    // TODO: Status code & message
+                    this->response_.metadata.status_code = match.error();
+                }
+                this->current_route_ = match.value();
+            }
+
             if (!result) {
                 goto send_body;
             }
-            switch (this->request_reader_.getContext().state) {
-                case HTTP1RequestParser::STATE::METADATA_DONE:
+            switch (state) {
+                case v1::RequestParser::STATE::METADATA_DONE: {
                     auto match = router_->match(this->request_);
                     if (!match) {
                         break;
@@ -43,31 +55,37 @@ namespace usub::unet::http {
                     }
                     goto continue_parse;
                     break;
-                case HTTP1RequestParser::STATE::HEADERS_DONE:
-                case HTTP1RequestParser::STATE::TRAILERS_DONE:
+                }
+                case v1::RequestParser::STATE::HEADERS_DONE:
+                    [[fallthrough]];
+                case v1::RequestParser::STATE::TRAILERS_DONE: {
                     auto middleware_result = this->invoke_middleware(MIDDLEWARE_PHASE::HEADER, request_, response_);
                     if (!middleware_result) {
                         break;
                     }
                     goto continue_parse;
                     break;
-                case HTTP1RequestParser::STATE::DATA_CHUNK_DONE:
+                }
+                case v1::RequestParser::STATE::DATA_CHUNK_DONE: {
                     auto middleware_result = this->invoke_middleware(MIDDLEWARE_PHASE::BODY, request_, response_);
                     if (!middleware_result) {
                         break;
                     }
                     goto continue_parse;
                     break;
-                case HTTP1RequestParser::STATE::COMPLETE:
+                }
+                case v1::RequestParser::STATE::COMPLETE: {
 
-                    auto handler = this->current_route_->handler();
+                    auto handler = this->current_route_->handler;
                     co_await handler(request_, response_);
 
                     break;
-                case HTTP1RequestParser::STATE::FAILED:
+                }
+                case v1::RequestParser::STATE::FAILED:
                     // Handle parse error
                     break;
                 default:
+                    // any other state
                     goto end;
                     break;
             }
@@ -77,36 +95,53 @@ namespace usub::unet::http {
             co_return;
         };
         usub::uvent::task::Awaitable<void> on_close() {
+            if (this->current_route_) {
+                auto &context = this->request_reader_.getContext();
+                context.state = v1::RequestParser::STATE::FAILED;
+            }
             co_return;
         }
         usub::uvent::task::Awaitable<void> on_error(int error_code) {
+            if (this->current_route_) {
+                auto &context = this->request_reader_.getContext();
+                context.state = v1::RequestParser::STATE::FAILED;
+            }
             co_return;
         }
 
         usub::uvent::task::Awaitable<void> write_response(usub::uvent::net::TCPClientSocket &socket) {
-            // const auto &responseString = this->response_.string();
-            // TODO: Implement HTTP/1 response serialization
 
-            ssize_t wrsz = co_await *socket.async_write((uint8_t *) responseString.data(), responseString.size());
+            // TODO:
+            if (this->current_route_) {
+
+            } else {
+            }
+            std::string responseString{"200 OK\r\nServer: usub/unet\r\nContent-Length: 0\r\n\r\n"};
+            ssize_t wrsz = co_await socket.async_write((uint8_t *) responseString.data(), responseString.size());
             if (wrsz <= 0) {
                 co_return;
             }
+            co_return;
         }
 
     private:
         Request request_{};
         Response response_{};
-        HTTP1RequestParser request_reader_{};
+        v1::RequestParser request_reader_{};
         // HTTP1ResponseSerializer response_writer_;
         std::shared_ptr<RouterType> router_;
         // TODO: Better way to handle current route?
-        std::optional<Route *> current_route_;
+        // std::optional<router::Route *> current_route_;
+        router::Route *current_route_;
 
 
-        bool invoke_middleware(const MiddlewarePhase &phase, Request &req, Response &res) {
+        bool invoke_middleware(const MIDDLEWARE_PHASE &phase, Request &req, Response &res) {
             return this->router_->getMiddlewareChain().execute(phase, req, res)
-                           ? this->middleware_chain.execute(phase, req, res)
+                           ? this->current_route_->middleware_chain.execute(phase, req, res)
                            : false;
         }
     };
+
+    template<class RouterType>
+    using Http1Session = ServerSession<VERSION::HTTP_1_1, RouterType>;
 }// namespace usub::unet::http

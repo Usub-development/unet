@@ -16,7 +16,7 @@ namespace usub::unet::core::stream {
         //     { &Dispatcher::on_error } -> std::same_as<usub::uvent::task::Awaitable<void> (Dispatcher::*)(std::error_code)>;
         // }
         static usub::uvent::task::Awaitable<void> readLoop(usub::uvent::net::TCPClientSocket socket,
-                                                           Dispatcher &dispatcher) {
+                                                           Dispatcher &&dispatcher) {
             usub::uvent::utils::DynamicBuffer buffer;
             static constexpr size_t MAX_READ_SIZE = 16 * 1024;
             buffer.reserve(MAX_READ_SIZE);
@@ -30,14 +30,14 @@ namespace usub::unet::core::stream {
                     break;
                 }
                 socket.set_timeout_ms(20000);
-                dispatcher.on_read(
+                co_await dispatcher.on_read(
                         std::string_view{reinterpret_cast<const char *>(buffer.data()), buffer.size()}, socket);
                 // we need to pass socket for writing response, and for possible timeout reset for keep-alive, for example
                 // or to close in case of error
             }
-
-        private:
         }
+
+    private:
     };
 
 }// namespace usub::unet::core::stream

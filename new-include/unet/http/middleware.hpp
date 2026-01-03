@@ -38,8 +38,8 @@ namespace usub::unet::http {
      * 
      * @note if false is returned, the middleware processing will halt and the response will not be sent automatically.
      */
-    using MiddlewareFunctionType = usub::uvent::task::Awaitable<bool>(Request &, Response &);
-
+    // using MiddlewareFunctionType = usub::uvent::task::Awaitable<bool>(Request &, Response &);
+    using MiddlewareFunctionType = bool(Request &, Response &);
 
     using StatusHandlerFunctionType = usub::uvent::task::Awaitable<void>(Request &, Response &);
 
